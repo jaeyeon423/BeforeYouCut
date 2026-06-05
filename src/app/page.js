@@ -1,65 +1,250 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Icon from '../components/icons';
+import IOSDevice from '../components/ios-device';
+import { 
+  useTweaks, 
+  TweaksPanel, 
+  TweakSection, 
+  TweakRadio, 
+  TweakColor 
+} from '../components/tweaks-panel';
+import { TopBar, BottomNav } from '../components/ui';
+import HomeScreen from '../components/screens/home';
+import { 
+  CategoryScreen, 
+  SearchScreen, 
+  SavedScreen, 
+  MyScreen, 
+  DetailScreen, 
+  SellerScreen, 
+  BagScreen 
+} from '../components/screens/other';
+import { SELLERS } from '../data/data';
+
+const TWEAK_DEFAULTS = {
+  "homeLayout": "magazine",
+  "cardVariant": "meta",
+  "navMode": "bottom",
+  "theme": "mono",
+  "typeStyle": "default"
+};
+
+function OverlayHeader({ title, onBack, cart, onBag }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="topbar bordered" style={{ paddingTop: 58 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <button className="icon-btn" onClick={onBack} aria-label="뒤로">
+          <Icon name="back" size={24} />
+        </button>
+        {title && (
+          <div className="wordmark" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {title}
+          </div>
+        )}
+      </div>
+      <div className="topbar-actions">
+        <button className="icon-btn" aria-label="공유"><Icon name="share" size={21} /></button>
+        <button className="icon-btn" onClick={onBag} aria-label="장바구니">
+          <Icon name="bag" size={22} />
+          {cart > 0 && <span className="dot" style={{ width: 7, height: 7 }} />}
+        </button>
+      </div>
     </div>
   );
 }
+
+export default function Home() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [tab, setTab] = useState("home");
+  const [stack, setStack] = useState([]);          // overlay screens stack
+  const [likes, setLikes] = useState(new Set());
+  const [following, setFollowing] = useState(new Set(["steelgrain"]));
+  const [cart, setCart] = useState([]);
+  const [toast, setToast] = useState(null);
+  
+  const toastTimerRef = useRef(null);
+  const rootRef = useRef(null);
+
+  // Scaler Effect matching original fit() logic
+  useEffect(() => {
+    const W = 402, H = 874;
+    function fit() {
+      const root = rootRef.current;
+      if (!root) return;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      if (!vw || !vh) return;
+      const s = Math.min(vw / W, vh / H, 1);
+      root.style.transform = `scale(${s})`;
+    }
+    
+    window.addEventListener('resize', fit);
+    fit();
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(fit);
+      ro.observe(document.documentElement);
+      const stage = document.getElementById('stage');
+      if (stage) ro.observe(stage);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', fit);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  const scrollKey = tab + "|" + stack.map((s) => s.kind + (s.sid || s.p?.id || "")).join(">");
+  const top = stack[stack.length - 1];
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 1600);
+  }, []);
+
+  const ctx = {
+    open: (p) => setStack((s) => [...s, { kind: "detail", p }]),
+    openSeller: (sid) => setStack((s) => [...s, { kind: "seller", sid }]),
+    openBag: () => setStack((s) => [...s, { kind: "bag" }]),
+    back: () => setStack((s) => s.slice(0, -1)),
+    likes, following, cart,
+    like: (id) => setLikes((s) => { 
+      const n = new Set(s); 
+      n.has(id) ? n.delete(id) : n.add(id); 
+      return n; 
+    }),
+    follow: (id) => setFollowing((s) => { 
+      const n = new Set(s); 
+      if (n.has(id)) { 
+        n.delete(id); 
+        showToast("팔로우를 취소했어요"); 
+      } else { 
+        n.add(id); 
+        showToast("브랜드를 팔로우했어요"); 
+      } 
+      return n; 
+    }),
+    addCart: (p) => { 
+      setCart((c) => [...c, p]); 
+      showToast("장바구니에 담았어요"); 
+    },
+    removeCart: (i) => setCart((c) => c.filter((_, k) => k !== i)),
+  };
+
+  const goNav = (key) => {
+    setStack([]);
+    if (key === "bag") { ctx.openBag(); return; }
+    if (key === "search") { setTab("search"); return; }
+    setTab(key);
+  };
+
+  // ---- render current main screen ----
+  let mainScreen, headerTitle = null;
+  if (top) {
+    if (top.kind === "detail") { 
+      mainScreen = <DetailScreen p={top.p} ctx={ctx} />; 
+      headerTitle = SELLERS[top.p.seller].name; 
+    }
+    else if (top.kind === "seller") { 
+      mainScreen = <SellerScreen sid={top.sid} cardVariant={t.cardVariant} ctx={ctx} />; 
+      headerTitle = "브랜드"; 
+    }
+    else if (top.kind === "bag") { 
+      mainScreen = <BagScreen ctx={ctx} />; 
+      headerTitle = "장바구니"; 
+    }
+  } else {
+    if (tab === "home") mainScreen = <HomeScreen layout={t.homeLayout} cardVariant={t.cardVariant} ctx={ctx} />;
+    else if (tab === "category") mainScreen = <CategoryScreen cardVariant={t.cardVariant} ctx={ctx} />;
+    else if (tab === "search") mainScreen = <SearchScreen ctx={ctx} />;
+    else if (tab === "saved") mainScreen = <SavedScreen ctx={ctx} />;
+    else if (tab === "my") mainScreen = <MyScreen ctx={ctx} />;
+  }
+
+  const tabTitles = { category: "카테고리", search: "검색", saved: "저장", my: "마이페이지" };
+  const useTopTabs = t.navMode === "top" && !top && tab === "home";
+
+  const dataTheme = t.theme === "mono" ? undefined : t.theme;
+  const dataType = t.typeStyle === "default" ? undefined : t.typeStyle;
+
+  return (
+    <div id="stage" style={{
+      position: 'fixed', inset: 0, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(120% 90% at 50% 0%, #f1f1f2 0%, #e4e4e6 55%, #dcdcde 100%)',
+    }}>
+      <div id="root" ref={rootRef} style={{ transformOrigin: 'center center', willChange: 'transform' }}>
+        <IOSDevice>
+          <div className="byc" data-theme={dataTheme} data-type={dataType}>
+            {/* header */}
+            {top ? (
+              <OverlayHeader title={headerTitle} onBack={ctx.back} cart={cart.length} onBag={ctx.openBag} />
+            ) : tab === "home" ? (
+              <TopBar onNav={(k) => goNav(k)} cart={cart.length} />
+            ) : (
+              <TopBar onNav={(k) => goNav(k)} cart={cart.length} title={tabTitles[tab]} bordered />
+            )}
+
+            {/* top tabs (nav variant) */}
+            {useTopTabs && (
+              <div className="toptabs">
+                {["추천", "랭킹", "신상", "브랜드", "세일", "핸드메이드"].map((c, i) => (
+                  <button key={c} className={"toptab" + (i === 0 ? " active" : "")}>{c}</button>
+                ))}
+              </div>
+            )}
+
+            {/* main */}
+            <React.Fragment key={scrollKey}>{mainScreen}</React.Fragment>
+
+            {/* bottom nav */}
+            {!top && <BottomNav active={tab} onNav={(k) => goNav(k)} />}
+
+            {/* toast */}
+            {toast && (
+              <div style={{
+                position: "absolute", left: "50%", bottom: 96, transform: "translateX(-50%)",
+                background: "rgba(17,17,17,0.92)", color: "#fff", fontSize: 13, fontWeight: 600,
+                padding: "12px 20px", borderRadius: 999, zIndex: 90, whiteSpace: "nowrap",
+                backdropFilter: "blur(8px)", letterSpacing: "-0.01em",
+              }}>{toast}</div>
+            )}
+
+            {/* tweaks */}
+            <TweaksPanel>
+              <TweakSection label="홈 레이아웃" />
+              <TweakRadio label="구조" value={t.homeLayout}
+                options={[{ value: "magazine", label: "매거진" }, { value: "grid", label: "그리드" }, { value: "ranking", label: "랭킹" }]}
+                onChange={(v) => { setTweak("homeLayout", v); setTab("home"); setStack([]); }} />
+
+              <TweakSection label="상품 카드" />
+              <TweakRadio label="스타일" value={t.cardVariant}
+                options={[{ value: "minimal", label: "심플" }, { value: "meta", label: "정보형" }, { value: "overlay", label: "오버레이" }]}
+                onChange={(v) => setTweak("cardVariant", v)} />
+
+              <TweakSection label="네비게이션" />
+              <TweakRadio label="홈 탐색" value={t.navMode}
+                options={[{ value: "bottom", label: "하단 탭" }, { value: "top", label: "상단 탭+하단" }]}
+                onChange={(v) => { setTweak("navMode", v); setTab("home"); setStack([]); }} />
+
+              <TweakSection label="컬러 · 타이포" />
+              <TweakColor label="액센트" value={ACCENTS[t.theme]}
+                options={Object.values(ACCENTS)}
+                onChange={(v) => setTweak("theme", THEME_BY_COLOR[v] || "mono")} />
+              <TweakRadio label="타이틀 서체" value={t.typeStyle}
+                options={[{ value: "default", label: "산세리프" }, { value: "condensed", label: "콘덴스드" }, { value: "serif", label: "세리프" }]}
+                onChange={(v) => setTweak("typeStyle", v)} />
+            </TweaksPanel>
+          </div>
+        </IOSDevice>
+      </div>
+    </div>
+  );
+}
+
+// accent swatches for the tweak color control
+const ACCENTS = { mono: "#111111", cobalt: "#1b3aff", tangerine: "#ff5a1f", forest: "#0e5b3f", acid: "#d6ff2e" };
+const THEME_BY_COLOR = Object.fromEntries(Object.entries(ACCENTS).map(([k, v]) => [v, k]));
