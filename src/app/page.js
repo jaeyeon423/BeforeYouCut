@@ -21,7 +21,7 @@ import {
   SellerScreen, 
   BagScreen 
 } from '../components/screens/other';
-import { SELLERS } from '../data/data';
+import { SELLERS as staticSellers, PRODUCTS as staticProducts } from '../data/data';
 
 const TWEAK_DEFAULTS = {
   "homeLayout": "magazine",
@@ -62,8 +62,12 @@ export default function Home() {
   const [likes, setLikes] = useState(new Set());
   const [following, setFollowing] = useState(new Set(["steelgrain"]));
   const [cart, setCart] = useState([]);
+  const [sellers, setSellers] = useState(staticSellers);
+  const [products, setProducts] = useState(staticProducts);
+  const [orders, setOrders] = useState([]);
   const [toast, setToast] = useState(null);
   
+  const [mounted, setMounted] = useState(false);
   const toastTimerRef = useRef(null);
   const rootRef = useRef(null);
 
@@ -96,6 +100,63 @@ export default function Home() {
     };
   }, []);
 
+  // Load from localStorage on client-mount
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const savedLikes = localStorage.getItem('byc_likes');
+      if (savedLikes) setLikes(new Set(JSON.parse(savedLikes)));
+
+      const savedFollowing = localStorage.getItem('byc_following');
+      if (savedFollowing) setFollowing(new Set(JSON.parse(savedFollowing)));
+
+      const savedCart = localStorage.getItem('byc_cart');
+      if (savedCart) setCart(JSON.parse(savedCart));
+
+      const savedSellers = localStorage.getItem('byc_sellers');
+      if (savedSellers) setSellers(JSON.parse(savedSellers));
+
+      const savedProducts = localStorage.getItem('byc_products');
+      if (savedProducts) setProducts(JSON.parse(savedProducts));
+
+      const savedOrders = localStorage.getItem('byc_orders');
+      if (savedOrders) setOrders(JSON.parse(savedOrders));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  // Sync state changes to localStorage
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_likes', JSON.stringify(Array.from(likes)));
+  }, [likes, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_following', JSON.stringify(Array.from(following)));
+  }, [following, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_cart', JSON.stringify(cart));
+  }, [cart, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_sellers', JSON.stringify(sellers));
+  }, [sellers, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_products', JSON.stringify(products));
+  }, [products, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_orders', JSON.stringify(orders));
+  }, [orders, mounted]);
+
   const scrollKey = tab + "|" + stack.map((s) => s.kind + (s.sid || s.p?.id || "")).join(">");
   const top = stack[stack.length - 1];
 
@@ -105,12 +166,40 @@ export default function Home() {
     toastTimerRef.current = setTimeout(() => setToast(null), 1600);
   }, []);
 
+  const byId = useCallback((id) => products.find((x) => x.id === id), [products]);
+  const bySeller = useCallback((sid) => products.filter((x) => x.seller === sid), [products]);
+  const byCat = useCallback((c) => c === "전체" ? products : products.filter((x) => x.cat === c), [products]);
+
+  // Ranking calculation dynamically based on likes/ratings
+  const ranking = ["p6", "p1", "p9", "p4", "p13"].map(byId).filter(Boolean);
+
+  const goNav = (key) => {
+    setStack([]);
+    if (key === "bag") { 
+      setStack([{ kind: "bag" }]); 
+      return; 
+    }
+    if (key === "search") { setTab("search"); return; }
+    setTab(key);
+  };
+
   const ctx = {
     open: (p) => setStack((s) => [...s, { kind: "detail", p }]),
     openSeller: (sid) => setStack((s) => [...s, { kind: "seller", sid }]),
     openBag: () => setStack((s) => [...s, { kind: "bag" }]),
     back: () => setStack((s) => s.slice(0, -1)),
-    likes, following, cart,
+    likes, 
+    following, 
+    cart,
+    sellers,
+    products,
+    ranking,
+    orders,
+    byCat,
+    bySeller,
+    byId,
+    goNav,
+    showToast,
     like: (id) => setLikes((s) => { 
       const n = new Set(s); 
       n.has(id) ? n.delete(id) : n.add(id); 
@@ -132,13 +221,10 @@ export default function Home() {
       showToast("장바구니에 담았어요"); 
     },
     removeCart: (i) => setCart((c) => c.filter((_, k) => k !== i)),
-  };
-
-  const goNav = (key) => {
-    setStack([]);
-    if (key === "bag") { ctx.openBag(); return; }
-    if (key === "search") { setTab("search"); return; }
-    setTab(key);
+    clearCart: () => setCart([]),
+    addOrder: (newOrder) => setOrders((o) => [newOrder, ...o]),
+    addSeller: (newSeller) => setSellers((s) => ({ ...s, [newSeller.id]: newSeller })),
+    addProduct: (newProduct) => setProducts((p) => [newProduct, ...p]),
   };
 
   // ---- render current main screen ----
@@ -146,7 +232,7 @@ export default function Home() {
   if (top) {
     if (top.kind === "detail") { 
       mainScreen = <DetailScreen p={top.p} ctx={ctx} />; 
-      headerTitle = SELLERS[top.p.seller].name; 
+      headerTitle = sellers[top.p.seller]?.name || top.p.seller; 
     }
     else if (top.kind === "seller") { 
       mainScreen = <SellerScreen sid={top.sid} cardVariant={t.cardVariant} ctx={ctx} />; 

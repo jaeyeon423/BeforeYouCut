@@ -84,8 +84,8 @@ export function Verified({ size = 13 }) {
 }
 
 // ---------- product card (variants: minimal | meta | overlay) ----------
-export function ProductCard({ p, variant = "meta", onOpen, liked, onLike }) {
-  const seller = SELLERS[p.seller];
+export function ProductCard({ p, variant = "meta", onOpen, liked, onLike, sellers = SELLERS }) {
+  const seller = sellers[p.seller] || { name: "알 수 없는 브랜드" };
   if (variant === "overlay") {
     return (
       <div className="pcard overlay" onClick={() => onOpen(p)}>
@@ -130,38 +130,38 @@ export function ProductCard({ p, variant = "meta", onOpen, liked, onLike }) {
 }
 
 // ---------- horizontal product rail ----------
-export function ProductRail({ items, variant, onOpen, likes, onLike }) {
+export function ProductRail({ items, variant, onOpen, likes, onLike, sellers = SELLERS }) {
   return (
     <div className="prow">
       {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} />
+        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} sellers={sellers} />
       ))}
     </div>
   );
 }
 
 // ---------- product grid ----------
-export function ProductGrid({ items, variant, onOpen, likes, onLike }) {
+export function ProductGrid({ items, variant, onOpen, likes, onLike, sellers = SELLERS }) {
   return (
     <div className="pgrid">
       {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} />
+        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} sellers={sellers} />
       ))}
     </div>
   );
 }
 
 // ---------- brand rail (stories-style) ----------
-export function BrandRail({ onOpenSeller }) {
-  const ids = Object.keys(SELLERS);
+export function BrandRail({ onOpenSeller, sellers = SELLERS }) {
+  const ids = Object.keys(sellers);
   return (
     <div className="brandrail">
       {ids.map((id) => {
-        const s = SELLERS[id];
+        const s = sellers[id];
         return (
           <div key={id} className="brandcell" onClick={() => onOpenSeller(id)}>
             <div className={"ring" + (s.products < 12 ? " new" : "")}>
-              <div className="ring-inner"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={26} /></div>
+              <div className="ring-inner"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={26} /></div>
             </div>
             <div className="bc-name">{s.name}</div>
           </div>
@@ -172,14 +172,14 @@ export function BrandRail({ onOpenSeller }) {
 }
 
 // ---------- brand spotlight card ----------
-export function BrandCard({ id, onOpenSeller, following, onFollow }) {
-  const s = SELLERS[id];
+export function BrandCard({ id, onOpenSeller, following, onFollow, sellers = SELLERS }) {
+  const s = sellers[id] || { name: id, category: "도구", desc: "", followers: "0", tone: "tone-a" };
   const isF = following?.has(id);
   return (
     <div className="brandcard" onClick={() => onOpenSeller(id)}>
-      <div className="brandcard-cover"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={40} /></div>
+      <div className="brandcard-cover"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={40} /></div>
       <div className="brandcard-foot">
-        <div className="brandcard-logo"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={22} /></div>
+        <div className="brandcard-logo"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={22} /></div>
         <div className="brandcard-info">
           <div className="brandcard-name">{s.name}{s.verified && <Verified size={13} />}</div>
           <div className="brandcard-desc">{s.desc} · 팔로워 {s.followers}</div>

@@ -10,13 +10,7 @@ import {
   BrandRail, 
   BrandCard 
 } from '../ui';
-import { 
-  SELLERS, 
-  PRODUCTS, 
-  RANKING, 
-  won, 
-  byCat 
-} from '../../data/data';
+import { won } from '../../data/data';
 
 export function HomePromo({ onMore }) {
   return (
@@ -43,7 +37,7 @@ export function HomeHero({ flush, onOpenSeller }) {
   );
 }
 
-export function RankingList({ items, onOpen }) {
+export function RankingList({ items, onOpen, sellers }) {
   return (
     <div>
       {items.map((p, i) => (
@@ -51,7 +45,7 @@ export function RankingList({ items, onOpen }) {
           <div className={"rank-num" + (i < 3 ? " top" : "")}>{i + 1}</div>
           <div className="rank-media"><Placeholder icon={p.icon} tone={p.tone} size={28} /></div>
           <div className="rank-body">
-            <div className="rank-brand">{SELLERS[p.seller].name}</div>
+            <div className="rank-brand">{sellers[p.seller]?.name || p.seller}</div>
             <div className="rank-name">{p.name}</div>
             <div className="rank-price">{won(p.price)}원</div>
           </div>
@@ -75,27 +69,27 @@ export function Foot() {
 }
 
 export default function HomeScreen({ layout, cardVariant, ctx }) {
-  const { open, openSeller, likes, like, following, follow } = ctx;
-  const newItems = PRODUCTS.filter((p) => p.badge === "new" || p.badge === "best").slice(0, 6);
+  const { open, openSeller, likes, like, following, follow, sellers, products, ranking, byCat } = ctx;
+  const newItems = products.filter((p) => p.badge === "new" || p.badge === "best").slice(0, 6);
   const handmade = byCat("핸드메이드").concat(byCat("앞치마·유니폼"));
 
   // shared blocks
   const brandRailBlock = (
     <div className="section" style={{ marginTop: 18 }}>
       <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" onMore={() => openSeller("steelgrain")} />
-      <BrandRail onOpenSeller={openSeller} />
+      <BrandRail onOpenSeller={openSeller} sellers={sellers} />
     </div>
   );
   const rankingBlock = (
     <div className="section">
       <SectionHeader title="실시간 랭킹" sub="지금 미용인들이 담는 도구" more="더보기" onMore={() => {}} />
-      <RankingList items={RANKING} onOpen={open} />
+      <RankingList items={ranking} onOpen={open} sellers={sellers} />
     </div>
   );
   const spotlightBlock = (
     <div className="section">
       <SectionHeader title="이번 주 브랜드" more="전체" onMore={() => openSeller("bladebros")} />
-      <BrandCard id="bladebros" onOpenSeller={openSeller} following={following} onFollow={follow} />
+      <BrandCard id="bladebros" onOpenSeller={openSeller} following={following} onFollow={follow} sellers={sellers} />
     </div>
   );
 
@@ -110,8 +104,8 @@ export default function HomeScreen({ layout, cardVariant, ctx }) {
         </div>
         {brandRailBlock}
         <div className="section" style={{ marginTop: 24 }}>
-          <SectionHeader title="전체 상품" sub={`입점 브랜드 ${Object.keys(SELLERS).length}곳 · ${PRODUCTS.length}개`} />
-          <ProductGrid items={PRODUCTS} variant={cardVariant} onOpen={open} likes={likes} onLike={like} />
+          <SectionHeader title="전체 상품" sub={`입점 브랜드 ${Object.keys(sellers).length}곳 · ${products.length}개`} />
+          <ProductGrid items={products} variant={cardVariant} onOpen={open} likes={likes} onLike={like} sellers={sellers} />
         </div>
         <HomePromo onMore={() => openSeller("steelgrain")} />
         <Foot />
@@ -130,13 +124,13 @@ export default function HomeScreen({ layout, cardVariant, ctx }) {
         </div>
         <div className="section" style={{ marginTop: 8 }}>
           <SectionHeader title="이번 주 랭킹" sub="판매·찜 기준 실시간 집계" />
-          <RankingList items={RANKING} onOpen={open} />
+          <RankingList items={ranking} onOpen={open} sellers={sellers} />
         </div>
         <div className="divider-strip" />
         {brandRailBlock}
         <div className="section">
           <SectionHeader title="신상품" more="전체" onMore={() => {}} />
-          <ProductRail items={newItems} variant={cardVariant === "overlay" ? "overlay" : "minimal"} onOpen={open} likes={likes} onLike={like} />
+          <ProductRail items={newItems} variant={cardVariant === "overlay" ? "overlay" : "minimal"} onOpen={open} likes={likes} onLike={like} sellers={sellers} />
         </div>
         <HomePromo onMore={() => openSeller("steelgrain")} />
         <Foot />
@@ -151,13 +145,13 @@ export default function HomeScreen({ layout, cardVariant, ctx }) {
       {brandRailBlock}
       <div className="section">
         <SectionHeader title="신상품" sub="방금 입점한 도구들" more="전체" onMore={() => {}} />
-        <ProductRail items={newItems} variant={cardVariant === "overlay" ? "overlay" : cardVariant} onOpen={open} likes={likes} onLike={like} />
+        <ProductRail items={newItems} variant={cardVariant === "overlay" ? "overlay" : cardVariant} onOpen={open} likes={likes} onLike={like} sellers={sellers} />
       </div>
       {rankingBlock}
       {spotlightBlock}
       <div className="section">
         <SectionHeader title="핸드메이드 · 워크웨어" sub="한 점씩 만드는 셀러" more="전체" onMore={() => openSeller("foldstudio")} />
-        <ProductGrid items={handmade.slice(0, 4)} variant={cardVariant} onOpen={open} likes={likes} onLike={like} />
+        <ProductGrid items={handmade.slice(0, 4)} variant={cardVariant} onOpen={open} likes={likes} onLike={like} sellers={sellers} />
       </div>
       <HomePromo onMore={() => openSeller("steelgrain")} />
       <Foot />

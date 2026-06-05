@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Icon from '../icons';
 import { 
   Placeholder, 
@@ -11,14 +11,10 @@ import {
   BrandCard
 } from '../ui';
 import { 
-  SELLERS, 
-  PRODUCTS, 
   CATEGORIES, 
   CAT_ICON, 
   POPULAR_KEYWORDS, 
-  won, 
-  bySeller, 
-  byCat 
+  won
 } from '../../data/data';
 import { Foot } from './home';
 
@@ -26,7 +22,7 @@ import { Foot } from './home';
 // CATEGORY
 // ============================================================
 export function CategoryScreen({ cardVariant, ctx }) {
-  const { open, likes, like } = ctx;
+  const { open, likes, like, sellers, byCat } = ctx;
   const [active, setActive] = React.useState("전체");
   const items = byCat(active);
   return (
@@ -46,7 +42,7 @@ export function CategoryScreen({ cardVariant, ctx }) {
       <div className="divider-strip" style={{ marginTop: 20 }} />
       <div className="section" style={{ marginTop: 16 }}>
         <SectionHeader title={active} sub={`${items.length}개 상품`} more="필터" onMore={() => {}} />
-        <ProductGrid items={items} variant={cardVariant} onOpen={open} likes={likes} onLike={like} />
+        <ProductGrid items={items} variant={cardVariant} onOpen={open} likes={likes} onLike={like} sellers={sellers} />
       </div>
       <Foot />
     </div>
@@ -57,10 +53,10 @@ export function CategoryScreen({ cardVariant, ctx }) {
 // SEARCH
 // ============================================================
 export function SearchScreen({ ctx }) {
-  const { open } = ctx;
+  const { open, products, sellers } = ctx;
   const [q, setQ] = React.useState("");
-  const results = q ? PRODUCTS.filter((p) =>
-    (p.name + SELLERS[p.seller].name + p.cat).toLowerCase().includes(q.toLowerCase())) : [];
+  const results = q ? products.filter((p) =>
+    (p.name + (sellers[p.seller]?.name || p.seller) + p.cat).toLowerCase().includes(q.toLowerCase())) : [];
   return (
     <div className="byc-scroll fadein" key="search">
       <div style={{ height: 8 }} />
@@ -87,7 +83,7 @@ export function SearchScreen({ ctx }) {
           <div className="search-section">
             <h4>브랜드 바로가기</h4>
             <div className="chiprow" style={{ padding: "0 0 4px" }}>
-              {Object.values(SELLERS).map((s) => (
+              {Object.values(sellers).map((s) => (
                 <div key={s.id} className="chip" onClick={() => ctx.openSeller(s.id)}>{s.name}</div>
               ))}
             </div>
@@ -99,7 +95,7 @@ export function SearchScreen({ ctx }) {
         <div className="section" style={{ marginTop: 14 }}>
           <SectionHeader title={`'${q}' 검색 결과`} sub={`${results.length}개`} />
           {results.length ? (
-            <ProductGrid items={results} variant="meta" onOpen={open} likes={ctx.likes} onLike={ctx.like} />
+            <ProductGrid items={results} variant="meta" onOpen={open} likes={ctx.likes} onLike={ctx.like} sellers={sellers} />
           ) : (
             <div style={{ padding: "60px 18px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
               검색 결과가 없습니다.
@@ -115,10 +111,22 @@ export function SearchScreen({ ctx }) {
 // PRODUCT DETAIL
 // ============================================================
 export function DetailScreen({ p, ctx }) {
-  const s = SELLERS[p.seller];
+  const { sellers, bySeller } = ctx;
+  const s = sellers[p.seller] || { name: p.seller, category: "도구", followers: "0", products: 0, tone: "tone-a" };
   const [dot, setDot] = React.useState(0);
+  const [inquireOpen, setInquireOpen] = useState(false);
+  const [inquiryText, setInquiryText] = useState("");
   const liked = ctx.likes.has(p.id);
   const related = bySeller(p.seller).filter((x) => x.id !== p.id).slice(0, 4);
+
+  const handleInquireSubmit = (e) => {
+    e.preventDefault();
+    if (!inquiryText.trim()) return;
+    ctx.showToast("문의가 셀러에게 전송되었습니다.");
+    setInquiryText("");
+    setInquireOpen(false);
+  };
+
   return (
     <>
       <div className="byc-scroll" key={"detail" + p.id}>
@@ -151,9 +159,9 @@ export function DetailScreen({ p, ctx }) {
 
         <div className="pd-divider" />
 
-        {/* seller strip — the key "입점 셀러" emphasis */}
+        {/* seller strip */}
         <div className="pd-sellerstrip" onClick={() => ctx.openSeller(s.id)}>
-          <div className="ss-logo"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={22} /></div>
+          <div className="ss-logo"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={22} /></div>
           <div className="ss-info">
             <div className="ss-name">{s.name}{s.verified && <Verified size={12} />}</div>
             <div className="ss-meta">입점 셀러 · 팔로워 {s.followers} · 상품 {s.products}개</div>
@@ -177,7 +185,7 @@ export function DetailScreen({ p, ctx }) {
         {related.length > 0 && (
           <div className="section" style={{ marginTop: 22 }}>
             <SectionHeader title={`${s.name}의 다른 상품`} more="브랜드" onMore={() => ctx.openSeller(s.id)} />
-            <ProductRail items={related} variant="minimal" onOpen={ctx.open} likes={ctx.likes} onLike={ctx.like} />
+            <ProductRail items={related} variant="minimal" onOpen={ctx.open} likes={ctx.likes} onLike={ctx.like} sellers={sellers} />
           </div>
         )}
         <Foot />
@@ -191,6 +199,39 @@ export function DetailScreen({ p, ctx }) {
         </button>
         <button className="buy" onClick={() => ctx.addCart(p)}>장바구니 담기</button>
       </div>
+
+      {/* Inquiry Form Modal */}
+      {inquireOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px", boxSizing: "border-box"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>상품 문의하기</h3>
+              <button className="icon-btn" onClick={() => setInquireOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            <form onSubmit={handleInquireSubmit}>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>셀러: {s.name}</div>
+              <textarea 
+                value={inquiryText}
+                onChange={(e) => setInquiryText(e.target.value)}
+                placeholder="문의 내용을 입력하세요 (배송, 상품 옵션 등)"
+                required
+                style={{
+                  width: "100%", height: 120, borderRadius: 8, border: "1px solid var(--line)",
+                  padding: 12, boxSizing: "border-box", fontFamily: "inherit", fontSize: 13,
+                  outline: "none", resize: "none", marginBottom: 18
+                }}
+              />
+              <button className="buy" type="submit" style={{ width: "100%" }}>문의 전송</button>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -199,25 +240,37 @@ export function DetailScreen({ p, ctx }) {
 // SELLER PROFILE
 // ============================================================
 export function SellerScreen({ sid, cardVariant, ctx }) {
-  const s = SELLERS[sid];
+  const { sellers, bySeller } = ctx;
+  const s = sellers[sid] || { name: sid, category: "도구", desc: "", followers: "0", products: 0, tone: "tone-a", story: [] };
   const [tab, setTab] = React.useState("상품");
+  const [inquireOpen, setInquireOpen] = useState(false);
+  const [inquiryText, setInquiryText] = useState("");
   const items = bySeller(sid);
   const isF = ctx.following.has(sid);
+
+  const handleInquireSubmit = (e) => {
+    e.preventDefault();
+    if (!inquiryText.trim()) return;
+    ctx.showToast("셀러에게 문의 메세지가 전송되었습니다.");
+    setInquiryText("");
+    setInquireOpen(false);
+  };
+
   return (
     <div className="byc-scroll fadein" key={"seller" + sid}>
-      <div className="sp-cover"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={56} /></div>
+      <div className="sp-cover"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={56} /></div>
       <div className="sp-head">
-        <div className="sp-logo"><Placeholder icon={CAT_ICON[s.category]} tone={s.tone} size={30} /></div>
+        <div className="sp-logo"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={30} /></div>
         <h1 className="sp-name">{s.name}{s.verified && <Verified size={20} />}</h1>
-        <div className="sp-tagline">{s.desc} · since {s.since}</div>
+        <div className="sp-tagline">{s.desc} · since {s.since || "2026"}</div>
         <div className="sp-stats">
-          <div className="sp-stat"><span className="num">{s.products}</span><span className="lbl">상품</span></div>
+          <div className="sp-stat"><span className="num">{items.length}</span><span className="lbl">상품</span></div>
           <div className="sp-stat"><span className="num">{s.followers}</span><span className="lbl">팔로워</span></div>
           <div className="sp-stat"><span className="num">{s.category}</span><span className="lbl">카테고리</span></div>
         </div>
         <div className="sp-actions">
           <button className={"btn-follow" + (isF ? " on" : "")} onClick={() => ctx.follow(sid)}>{isF ? "팔로잉" : "+ 팔로우"}</button>
-          <button className="btn-ghost">문의하기</button>
+          <button className="btn-ghost" onClick={() => setInquireOpen(true)}>문의하기</button>
         </div>
       </div>
 
@@ -235,14 +288,14 @@ export function SellerScreen({ sid, cardVariant, ctx }) {
 
       {tab === "상품" && (
         <div className="section" style={{ marginTop: 18 }}>
-          <ProductGrid items={items} variant={cardVariant} onOpen={ctx.open} likes={ctx.likes} onLike={ctx.like} />
+          <ProductGrid items={items} variant={cardVariant} onOpen={ctx.open} likes={ctx.likes} onLike={ctx.like} sellers={sellers} />
         </div>
       )}
       {tab === "브랜드 스토리" && (
         <div className="sp-story">
-          {s.story.map((para, i) => <p key={i}>{para}</p>)}
+          {s.story && s.story.length > 0 ? s.story.map((para, i) => <p key={i}>{para}</p>) : <p>작성된 브랜드 스토리가 없습니다.</p>}
           <div className="tag-strip">
-            {["#" + s.category, "#입점셀러", "#수제", "#since" + s.since].map((t) => <span key={t} className="t">{t}</span>)}
+            {["#" + s.category, "#입점셀러", "#수제", "#since" + (s.since || "2026")].map((t) => <span key={t} className="t">{t}</span>)}
           </div>
         </div>
       )}
@@ -264,21 +317,55 @@ export function SellerScreen({ sid, cardVariant, ctx }) {
         </div>
       )}
       <Foot />
+
+      {/* Inquiry Form Modal */}
+      {inquireOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px", boxSizing: "border-box"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>브랜드 문의하기</h3>
+              <button className="icon-btn" onClick={() => setInquireOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            <form onSubmit={handleInquireSubmit}>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>셀러: {s.name}</div>
+              <textarea 
+                value={inquiryText}
+                onChange={(e) => setInquiryText(e.target.value)}
+                placeholder="문의하실 내용을 작성해 주세요."
+                required
+                style={{
+                  width: "100%", height: 120, borderRadius: 8, border: "1px solid var(--line)",
+                  padding: 12, boxSizing: "border-box", fontFamily: "inherit", fontSize: 13,
+                  outline: "none", resize: "none", marginBottom: 18
+                }}
+              />
+              <button className="buy" type="submit" style={{ width: "100%" }}>문의 전송</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================================
-// SIMPLE PLACEHOLDER SCREENS (saved / my / bag)
+// SAVED LIST
 // ============================================================
 export function SavedScreen({ ctx }) {
-  const items = PRODUCTS.filter((p) => ctx.likes.has(p.id));
+  const { open, likes, like, products, sellers } = ctx;
+  const items = products.filter((p) => likes.has(p.id));
   return (
     <div className="byc-scroll fadein" key="saved">
       <div className="section" style={{ marginTop: 14 }}>
         <SectionHeader title="저장한 도구" sub={`${items.length}개`} />
         {items.length ? (
-          <ProductGrid items={items} variant="meta" onOpen={ctx.open} likes={ctx.likes} onLike={ctx.like} />
+          <ProductGrid items={items} variant="meta" onOpen={open} likes={likes} onLike={like} sellers={sellers} />
         ) : (
           <div style={{ padding: "70px 30px", textAlign: "center", color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>
             <div style={{ color: "var(--muted-2)", marginBottom: 12 }}><Icon name="heart" size={40} stroke={1.4} /></div>
@@ -291,9 +378,45 @@ export function SavedScreen({ ctx }) {
   );
 }
 
+// ============================================================
+// SHOPPING BAG & CHECKOUT
+// ============================================================
 export function BagScreen({ ctx }) {
   const items = ctx.cart;
+  const sellers = ctx.sellers;
   const total = items.reduce((a, p) => a + p.price, 0);
+
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [buyerName, setBuyerName] = useState("김미용");
+  const [buyerPhone, setBuyerPhone] = useState("010-1234-5678");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [payMethod, setPayMethod] = useState("카드결제");
+
+  const handleCheckoutSubmit = (e) => {
+    e.preventDefault();
+    if (!shippingAddress.trim()) {
+      alert("배송지를 입력해 주세요.");
+      return;
+    }
+    
+    // Create new order record
+    const newOrder = {
+      id: "BYC-" + Math.floor(Math.random() * 900000 + 100000),
+      items: items.map(p => ({ id: p.id, name: p.name, price: p.price, seller: p.seller, icon: p.icon, tone: p.tone })),
+      total: total,
+      date: new Date().toLocaleDateString("ko-KR"),
+      status: "배송 준비중",
+      buyer: buyerName,
+      address: shippingAddress,
+      payment: payMethod
+    };
+
+    ctx.addOrder(newOrder);
+    ctx.clearCart();
+    ctx.showToast("주문 및 결제가 완료되었습니다!");
+    setCheckoutOpen(false);
+  };
+
   return (
     <>
       <div className="byc-scroll fadein" key="bag">
@@ -303,7 +426,7 @@ export function BagScreen({ ctx }) {
             <div key={i} className="rankrow" style={{ borderBottom: "1px solid var(--line)" }} onClick={() => ctx.open(p)}>
               <div className="rank-media"><Placeholder icon={p.icon} tone={p.tone} size={28} /></div>
               <div className="rank-body">
-                <div className="rank-brand">{SELLERS[p.seller].name}</div>
+                <div className="rank-brand">{sellers[p.seller]?.name || p.seller}</div>
                 <div className="rank-name">{p.name}</div>
                 <div className="rank-price">{won(p.price)}원</div>
               </div>
@@ -320,14 +443,148 @@ export function BagScreen({ ctx }) {
       </div>
       {items.length > 0 && (
         <div className="pd-buybar">
-          <button className="buy" onClick={() => {}}>{won(total)}원 · 주문하기</button>
+          <button className="buy" onClick={() => setCheckoutOpen(true)}>{won(total)}원 · 주문하기</button>
+        </div>
+      )}
+
+      {/* Checkout Dialog Modal */}
+      {checkoutOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px 30px", boxSizing: "border-box", maxHeight: "85%", overflowY: "auto"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>주문 / 결제하기</h3>
+              <button className="icon-btn" onClick={() => setCheckoutOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleCheckoutSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>주문자 정보</label>
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
+                    value={buyerName} onChange={e => setBuyerName(e.target.value)} required placeholder="이름" />
+                  <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
+                    value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} required placeholder="연락처" />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>배송지 주소</label>
+                <input className="searchbar" style={{ margin: "6px 0 0", width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
+                  value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} required placeholder="배송지 주소를 상세히 입력해 주세요." />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6, display: "block" }}>결제 수단</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["카드결제", "토스페이", "카카오페이"].map(m => (
+                    <button key={m} type="button" 
+                      onClick={() => setPayMethod(m)}
+                      style={{
+                        flex: 1, padding: "10px 0", fontSize: 12.5, fontWeight: 600,
+                        border: payMethod === m ? "1.5px solid var(--ink)" : "1px solid var(--line)",
+                        borderRadius: 6, background: payMethod === m ? "var(--ink)" : "#fff",
+                        color: payMethod === m ? "#fff" : "var(--ink-soft)", cursor: "pointer"
+                      }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+                  <span style={{ fontSize: 13, color: "var(--ink-soft)", fontWeight: 600 }}>총 결제 금액</span>
+                  <span style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{won(total)}원</span>
+                </div>
+                <button className="buy" type="submit" style={{ width: "100%" }}>결제하기</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </>
   );
 }
 
+// ============================================================
+// MY PAGE & ONBOARDING
+// ============================================================
 export function MyScreen({ ctx }) {
+  const { sellers, following, likes, orders } = ctx;
+  const [onboardOpen, setOnboardOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [followingOpen, setFollowingOpen] = useState(false);
+
+  // Onboarding Form States
+  const [brandName, setBrandName] = useState("");
+  const [brandCategory, setBrandCategory] = useState("도구");
+  const [brandDesc, setBrandDesc] = useState("");
+  const [brandNotice, setBrandNotice] = useState("");
+  const [brandStory, setBrandStory] = useState("");
+  const [prodName, setProdName] = useState("");
+  const [prodPrice, setProdPrice] = useState("");
+
+  const handleOnboardSubmit = (e) => {
+    e.preventDefault();
+    if (!brandName.trim()) return;
+
+    const newBrandId = "seller_" + Date.now();
+    const newBrand = {
+      id: newBrandId,
+      name: brandName,
+      verified: false,
+      desc: brandDesc || `${brandCategory} 전문 셀러`,
+      category: brandCategory,
+      followers: "0",
+      products: prodName ? 1 : 0,
+      since: new Date().getFullYear().toString(),
+      tone: "tone-a",
+      story: brandStory ? [brandStory] : ["신규 입점 브랜드 스토리입니다."],
+      notice: brandNotice || null
+    };
+
+    ctx.addSeller(newBrand);
+
+    if (prodName && prodPrice) {
+      const newProductId = "p_" + Date.now();
+      const newProduct = {
+        id: newProductId,
+        seller: newBrandId,
+        name: prodName,
+        price: Number(prodPrice) || 10000,
+        cat: brandCategory,
+        icon: CAT_ICON[brandCategory] || "scissors",
+        tone: "tone-a",
+        badge: "new",
+        disc: null,
+        orig: null,
+        rating: 5.0,
+        reviews: 0,
+        likes: 0,
+        spec: [["입점일", new Date().toLocaleDateString("ko-KR")]],
+        desc: `${prodName} 설명입니다.`
+      };
+      ctx.addProduct(newProduct);
+    }
+
+    ctx.showToast("브랜드 입점 신청이 완료되었습니다!");
+    
+    // Clear forms
+    setBrandName("");
+    setBrandDesc("");
+    setBrandNotice("");
+    setBrandStory("");
+    setProdName("");
+    setProdPrice("");
+    setOnboardOpen(false);
+  };
+
   return (
     <div className="byc-scroll fadein" key="my">
       <div style={{ padding: "26px 18px 6px", display: "flex", alignItems: "center", gap: 14 }}>
@@ -336,36 +593,217 @@ export function MyScreen({ ctx }) {
         </div>
         <div>
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>김미용 디자이너</div>
-          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>일반회원 · 팔로잉 {ctx.following.size}</div>
+          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>일반회원 · 팔로잉 {following.size}</div>
         </div>
       </div>
 
       <div style={{ display: "flex", margin: "18px", border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-        {[["주문", "0"], ["저장", String(ctx.likes.size)], ["쿠폰", "2"], ["적립금", "0"]].map(([l, v], i) => (
-          <div key={l} style={{ flex: 1, padding: "16px 0", textAlign: "center", borderLeft: i ? "1px solid var(--line)" : "none" }}>
+        {[
+          ["주문", String(orders.length), () => setHistoryOpen(true)], 
+          ["저장", String(likes.size), () => ctx.goNav("saved")], 
+          ["쿠폰", "2", null], 
+          ["적립금", "0", null]
+        ].map(([l, v, action], i) => (
+          <div key={l} 
+            onClick={action}
+            style={{ 
+              flex: 1, padding: "16px 0", textAlign: "center", 
+              borderLeft: i ? "1px solid var(--line)" : "none",
+              cursor: action ? "pointer" : "default" 
+            }}>
             <div style={{ fontSize: 18, fontWeight: 800 }}>{v}</div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{l}</div>
           </div>
         ))}
       </div>
 
-      {/* seller onboarding CTA — connects to the "입점" goal */}
-      <div className="banner-promo" style={{ margin: "8px 18px 0" }} onClick={() => {}}>
+      {/* seller onboarding CTA */}
+      <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => setOnboardOpen(true)}>
         <div className="bp-kicker">FOR SELLERS</div>
         <div className="bp-title">내 브랜드를<br/>입점시키기</div>
-        <div className="bp-sub">미용인이라면 누구나 셀러가 될 수 있어요. 수수료·정산 안내 보기.</div>
+        <div className="bp-sub">미용인이라면 누구나 셀러가 될 수 있어요. 입점하고 상품을 등록해 보세요.</div>
         <div className="bp-arrow"><Icon name="store" size={22} /></div>
       </div>
 
       <div style={{ marginTop: 24 }}>
-        {["주문 내역", "팔로우한 브랜드", "최근 본 상품", "리뷰 관리", "고객센터", "설정"].map((l, i) => (
-          <div key={l} style={{ display: "flex", alignItems: "center", padding: "16px 18px", borderTop: i === 0 ? "1px solid var(--line)" : "none", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
-            <span style={{ flex: 1, fontSize: 14, letterSpacing: "-0.02em" }}>{l}</span>
+        {[
+          { label: "주문 내역", action: () => setHistoryOpen(true) },
+          { label: "팔로우한 브랜드", action: () => setFollowingOpen(true) },
+          { label: "최근 본 상품", action: () => {} },
+          { label: "리뷰 관리", action: () => {} },
+          { label: "고객센터", action: () => {} },
+          { label: "설정", action: () => {} }
+        ].map((item, i) => (
+          <div key={item.label} 
+            onClick={item.action}
+            style={{ display: "flex", alignItems: "center", padding: "16px 18px", borderTop: i === 0 ? "1px solid var(--line)" : "none", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
+            <span style={{ flex: 1, fontSize: 14, letterSpacing: "-0.02em" }}>{item.label}</span>
             <span style={{ color: "var(--muted-2)" }}><Icon name="chev-r-sm" size={16} /></span>
           </div>
         ))}
       </div>
       <Foot />
+
+      {/* Seller Onboarding Modal */}
+      {onboardOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px 30px", boxSizing: "border-box", maxHeight: "90%", overflowY: "auto"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>내 브랜드 셀러 신청</h3>
+              <button className="icon-btn" onClick={() => setOnboardOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleOnboardSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>브랜드 정보</label>
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
+                    value={brandName} onChange={e => setBrandName(e.target.value)} required placeholder="브랜드명" />
+                  
+                  <select 
+                    value={brandCategory}
+                    onChange={e => setBrandCategory(e.target.value)}
+                    style={{
+                      border: "1px solid var(--line)", background: "var(--surface)", 
+                      borderRadius: 6, padding: 10, fontSize: 13, outline: "none", flex: 1
+                    }}>
+                    {["도구", "가위", "클리퍼", "빗·브러시", "앞치마·유니폼", "소모품", "핸드메이드"].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <input className="searchbar" style={{ margin: 0, width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
+                  value={brandDesc} onChange={e => setBrandDesc(e.target.value)} placeholder="한 줄 소개 (예: 단조 수제 가위 전문)" />
+              </div>
+
+              <div>
+                <input className="searchbar" style={{ margin: 0, width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
+                  value={brandNotice} onChange={e => setBrandNotice(e.target.value)} placeholder="공지 사항 (예: 신규 회원 10% 쿠폰)" />
+              </div>
+
+              <div>
+                <textarea 
+                  value={brandStory}
+                  onChange={(e) => setBrandStory(e.target.value)}
+                  placeholder="브랜드 스토리를 작성해 주세요. (가치관, 제작 방식 등)"
+                  style={{
+                    width: "100%", height: 80, borderRadius: 8, border: "1px solid var(--line)",
+                    padding: 10, boxSizing: "border-box", fontFamily: "inherit", fontSize: 13,
+                    outline: "none", resize: "none"
+                  }}
+                />
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 6 }}>첫 상품 등록 (선택)</label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <input className="searchbar" style={{ margin: 0, flex: 2, padding: 10, borderRadius: 6, fontSize: 13 }}
+                    value={prodName} onChange={e => setProdName(e.target.value)} placeholder="상품명" />
+                  <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
+                    value={prodPrice} type="number" onChange={e => setProdPrice(e.target.value)} placeholder="가격(원)" />
+                </div>
+              </div>
+
+              <button className="buy" type="submit" style={{ width: "100%", marginTop: 10 }}>입점 및 상품 등록</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Order History Modal */}
+      {historyOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px 30px", boxSizing: "border-box", maxHeight: "85%", overflowY: "auto"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>주문 내역</h3>
+              <button className="icon-btn" onClick={() => setHistoryOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {orders.length > 0 ? orders.map(ord => (
+                <div key={ord.id} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--line)", paddingBottom: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>{ord.id}</span>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{ord.date}</span>
+                  </div>
+                  {ord.items.map((item, idx) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
+                      <Placeholder icon={item.icon} tone={item.tone} size={20} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: "var(--muted)" }}>{sellers[item.seller]?.name || item.seller}</div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{won(item.price)}원</div>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, fontSize: 12 }}>
+                    <span style={{ color: "var(--ink-soft)" }}>배송상태: <b>{ord.status}</b></span>
+                    <span style={{ fontWeight: 800 }}>총 {won(ord.total)}원</span>
+                  </div>
+                </div>
+              )) : (
+                <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                  주문하신 내역이 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Followed Brands Modal */}
+      {followingOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px 30px", boxSizing: "border-box", maxHeight: "85%", overflowY: "auto"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>팔로우한 브랜드</h3>
+              <button className="icon-btn" onClick={() => setFollowingOpen(false)}><Icon name="close" size={20} /></button>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {Array.from(following).length > 0 ? Array.from(following).map(fid => {
+                const s = sellers[fid] || { name: fid, category: "도구", desc: "전문 셀러" };
+                return (
+                  <div key={fid} style={{ display: "flex", alignItems: "center", gap: 12, border: "1px solid var(--line)", borderRadius: 8, padding: 10, cursor: "pointer" }}
+                    onClick={() => { ctx.openSeller(fid); setFollowingOpen(false); }}>
+                    <Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone || "tone-a"} size={22} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)" }}>{s.desc}</div>
+                    </div>
+                    <button className="icon-btn" style={{ color: "var(--muted)" }} onClick={(e) => { e.stopPropagation(); ctx.follow(fid); }}><Icon name="close" size={16} /></button>
+                  </div>
+                );
+              }) : (
+                <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                  팔로우한 브랜드가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
