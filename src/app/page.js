@@ -2,14 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Icon from '../components/icons';
-import IOSDevice from '../components/ios-device';
-import { 
-  useTweaks, 
-  TweaksPanel, 
-  TweakSection, 
-  TweakRadio, 
-  TweakColor 
-} from '../components/tweaks-panel';
 import { TopBar, BottomNav } from '../components/ui';
 import HomeScreen from '../components/screens/home';
 import { 
@@ -23,17 +15,17 @@ import {
 } from '../components/screens/other';
 import { SELLERS as staticSellers, PRODUCTS as staticProducts } from '../data/data';
 
-const TWEAK_DEFAULTS = {
-  "homeLayout": "magazine",
-  "cardVariant": "meta",
-  "navMode": "bottom",
-  "theme": "mono",
-  "typeStyle": "default"
+// Frozen production configurations
+const CONFIG = {
+  homeLayout: "magazine",
+  cardVariant: "meta",
+  theme: "mono",
+  typeStyle: "default"
 };
 
 function OverlayHeader({ title, onBack, cart, onBag }) {
   return (
-    <div className="topbar bordered" style={{ paddingTop: 58 }}>
+    <div className="topbar bordered" style={{ paddingTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         <button className="icon-btn" onClick={onBack} aria-label="뒤로">
           <Icon name="back" size={24} />
@@ -56,7 +48,6 @@ function OverlayHeader({ title, onBack, cart, onBag }) {
 }
 
 export default function Home() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [tab, setTab] = useState("home");
   const [stack, setStack] = useState([]);          // overlay screens stack
   const [likes, setLikes] = useState(new Set());
@@ -69,36 +60,6 @@ export default function Home() {
   
   const [mounted, setMounted] = useState(false);
   const toastTimerRef = useRef(null);
-  const rootRef = useRef(null);
-
-  // Scaler Effect matching original fit() logic
-  useEffect(() => {
-    const W = 402, H = 874;
-    function fit() {
-      const root = rootRef.current;
-      if (!root) return;
-      const vw = window.innerWidth, vh = window.innerHeight;
-      if (!vw || !vh) return;
-      const s = Math.min(vw / W, vh / H, 1);
-      root.style.transform = `scale(${s})`;
-    }
-    
-    window.addEventListener('resize', fit);
-    fit();
-
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(fit);
-      ro.observe(document.documentElement);
-      const stage = document.getElementById('stage');
-      if (stage) ro.observe(stage);
-    }
-    
-    return () => {
-      window.removeEventListener('resize', fit);
-      if (ro) ro.disconnect();
-    };
-  }, []);
 
   // Load from localStorage on client-mount
   useEffect(() => {
@@ -235,7 +196,7 @@ export default function Home() {
       headerTitle = sellers[top.p.seller]?.name || top.p.seller; 
     }
     else if (top.kind === "seller") { 
-      mainScreen = <SellerScreen sid={top.sid} cardVariant={t.cardVariant} ctx={ctx} />; 
+      mainScreen = <SellerScreen sid={top.sid} cardVariant={CONFIG.cardVariant} ctx={ctx} />; 
       headerTitle = "브랜드"; 
     }
     else if (top.kind === "bag") { 
@@ -243,94 +204,59 @@ export default function Home() {
       headerTitle = "장바구니"; 
     }
   } else {
-    if (tab === "home") mainScreen = <HomeScreen layout={t.homeLayout} cardVariant={t.cardVariant} ctx={ctx} />;
-    else if (tab === "category") mainScreen = <CategoryScreen cardVariant={t.cardVariant} ctx={ctx} />;
+    if (tab === "home") mainScreen = <HomeScreen layout={CONFIG.homeLayout} cardVariant={CONFIG.cardVariant} ctx={ctx} />;
+    else if (tab === "category") mainScreen = <CategoryScreen cardVariant={CONFIG.cardVariant} ctx={ctx} />;
     else if (tab === "search") mainScreen = <SearchScreen ctx={ctx} />;
     else if (tab === "saved") mainScreen = <SavedScreen ctx={ctx} />;
     else if (tab === "my") mainScreen = <MyScreen ctx={ctx} />;
   }
 
   const tabTitles = { category: "카테고리", search: "검색", saved: "저장", my: "마이페이지" };
-  const useTopTabs = t.navMode === "top" && !top && tab === "home";
-
-  const dataTheme = t.theme === "mono" ? undefined : t.theme;
-  const dataType = t.typeStyle === "default" ? undefined : t.typeStyle;
 
   return (
-    <div id="stage" style={{
-      position: 'fixed', inset: 0, overflow: 'hidden',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'radial-gradient(120% 90% at 50% 0%, #f1f1f2 0%, #e4e4e6 55%, #dcdcde 100%)',
+    <div style={{
+      minHeight: '100vh',
+      background: '#f1f1f2',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
     }}>
-      <div id="root" ref={rootRef} style={{ transformOrigin: 'center center', willChange: 'transform' }}>
-        <IOSDevice>
-          <div className="byc" data-theme={dataTheme} data-type={dataType}>
-            {/* header */}
-            {top ? (
-              <OverlayHeader title={headerTitle} onBack={ctx.back} cart={cart.length} onBag={ctx.openBag} />
-            ) : tab === "home" ? (
-              <TopBar onNav={(k) => goNav(k)} cart={cart.length} />
-            ) : (
-              <TopBar onNav={(k) => goNav(k)} cart={cart.length} title={tabTitles[tab]} bordered />
-            )}
+      <div className="byc" data-theme={CONFIG.theme} data-type={CONFIG.typeStyle} style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '480px',
+        height: '100vh',
+        background: 'var(--paper)',
+        boxShadow: '0 0 20px rgba(0,0,0,0.06)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        {/* header */}
+        {top ? (
+          <OverlayHeader title={headerTitle} onBack={ctx.back} cart={cart.length} onBag={ctx.openBag} />
+        ) : tab === "home" ? (
+          <TopBar onNav={(k) => goNav(k)} cart={cart.length} />
+        ) : (
+          <TopBar onNav={(k) => goNav(k)} cart={cart.length} title={tabTitles[tab]} bordered />
+        )}
 
-            {/* top tabs (nav variant) */}
-            {useTopTabs && (
-              <div className="toptabs">
-                {["추천", "랭킹", "신상", "브랜드", "세일", "핸드메이드"].map((c, i) => (
-                  <button key={c} className={"toptab" + (i === 0 ? " active" : "")}>{c}</button>
-                ))}
-              </div>
-            )}
+        {/* main */}
+        <React.Fragment key={scrollKey}>{mainScreen}</React.Fragment>
 
-            {/* main */}
-            <React.Fragment key={scrollKey}>{mainScreen}</React.Fragment>
+        {/* bottom nav */}
+        {!top && <BottomNav active={tab} onNav={(k) => goNav(k)} />}
 
-            {/* bottom nav */}
-            {!top && <BottomNav active={tab} onNav={(k) => goNav(k)} />}
-
-            {/* toast */}
-            {toast && (
-              <div style={{
-                position: "absolute", left: "50%", bottom: 96, transform: "translateX(-50%)",
-                background: "rgba(17,17,17,0.92)", color: "#fff", fontSize: 13, fontWeight: 600,
-                padding: "12px 20px", borderRadius: 999, zIndex: 90, whiteSpace: "nowrap",
-                backdropFilter: "blur(8px)", letterSpacing: "-0.01em",
-              }}>{toast}</div>
-            )}
-
-            {/* tweaks */}
-            <TweaksPanel>
-              <TweakSection label="홈 레이아웃" />
-              <TweakRadio label="구조" value={t.homeLayout}
-                options={[{ value: "magazine", label: "매거진" }, { value: "grid", label: "그리드" }, { value: "ranking", label: "랭킹" }]}
-                onChange={(v) => { setTweak("homeLayout", v); setTab("home"); setStack([]); }} />
-
-              <TweakSection label="상품 카드" />
-              <TweakRadio label="스타일" value={t.cardVariant}
-                options={[{ value: "minimal", label: "심플" }, { value: "meta", label: "정보형" }, { value: "overlay", label: "오버레이" }]}
-                onChange={(v) => setTweak("cardVariant", v)} />
-
-              <TweakSection label="네비게이션" />
-              <TweakRadio label="홈 탐색" value={t.navMode}
-                options={[{ value: "bottom", label: "하단 탭" }, { value: "top", label: "상단 탭+하단" }]}
-                onChange={(v) => { setTweak("navMode", v); setTab("home"); setStack([]); }} />
-
-              <TweakSection label="컬러 · 타이포" />
-              <TweakColor label="액센트" value={ACCENTS[t.theme]}
-                options={Object.values(ACCENTS)}
-                onChange={(v) => setTweak("theme", THEME_BY_COLOR[v] || "mono")} />
-              <TweakRadio label="타이틀 서체" value={t.typeStyle}
-                options={[{ value: "default", label: "산세리프" }, { value: "condensed", label: "콘덴스드" }, { value: "serif", label: "세리프" }]}
-                onChange={(v) => setTweak("typeStyle", v)} />
-            </TweaksPanel>
-          </div>
-        </IOSDevice>
+        {/* toast */}
+        {toast && (
+          <div style={{
+            position: "absolute", left: "50%", bottom: 96, transform: "translateX(-50%)",
+            background: "rgba(17,17,17,0.92)", color: "#fff", fontSize: 13, fontWeight: 600,
+            padding: "12px 20px", borderRadius: 999, zIndex: 90, whiteSpace: "nowrap",
+            backdropFilter: "blur(8px)", letterSpacing: "-0.01em",
+          }}>{toast}</div>
+        )}
       </div>
     </div>
   );
 }
-
-// accent swatches for the tweak color control
-const ACCENTS = { mono: "#111111", cobalt: "#1b3aff", tangerine: "#ff5a1f", forest: "#0e5b3f", acid: "#d6ff2e" };
-const THEME_BY_COLOR = Object.fromEntries(Object.entries(ACCENTS).map(([k, v]) => [v, k]));
