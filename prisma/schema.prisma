@@ -1,0 +1,108 @@
+datasource db {
+  provider  = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id // Corresponds to Supabase auth.users.id UUID
+  email     String   @unique
+  name      String?
+  role      String   @default("BUYER") // BUYER | SELLER | ADMIN
+  createdAt DateTime @default(now())
+
+  seller    Seller?
+  orders    Order[]
+  likes     Like[]
+  follows   Follow[]
+}
+
+model Seller {
+  id             String   @id // Custom string ID e.g., "steelgrain", "bladebros"
+  name           String
+  verified       Boolean  @default(false)
+  desc           String
+  category       String
+  followers      String   @default("0") // Display number (or sync dynamically)
+  productsCount  Int      @default(0)
+  since          String
+  tone           String   @default("tone-a")
+  story          String[] // Story paragraphs
+  notice         String?
+
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  products       Product[]
+  follows        Follow[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  price       Int
+  cat         String
+  icon        String   @default("scissors")
+  tone        String   @default("tone-a")
+  badge       String?  // new | best | ltd | null
+  disc        Int?     // discount %
+  orig        Int?     // original price before discount
+  rating      Float    @default(4.8)
+  reviews     Int      @default(0)
+  likesCount  Int      @default(0)
+  desc        String   // product short description
+  spec        Json     @default("[]") // serialized JSON spec array of key-value tuples
+
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  likes       Like[]
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  total     Int
+  status    String   @default("배송 준비중")
+  date      DateTime @default(now())
+  address   String
+  name      String   // Recipient Name
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  
+  price     Int
+  quantity  Int      @default(1)
+}
+
+model Like {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+}
+
+model Follow {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sellerId])
+}
