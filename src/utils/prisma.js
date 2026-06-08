@@ -13,11 +13,13 @@ const connectionString =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL;
 
-let prisma;
+let realPrisma = null;
 
 const createPrismaClient = () => {
   if (!connectionString) {
-    throw new Error("Database connection URL is not defined in environment variables.");
+    throw new Error(
+      "Database connection URL is not defined in environment variables. Please check your Vercel Project Settings."
+    );
   }
   
   // Clean connection string (remove quotes)
@@ -36,14 +38,21 @@ const createPrismaClient = () => {
   return new PrismaClient({ adapter });
 };
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = createPrismaClient();
-} else {
-  if (!global.globalPrisma) {
-    global.globalPrisma = createPrismaClient();
+const prismaProxy = new Proxy({}, {
+  get(target, prop) {
+    if (!realPrisma) {
+      if (process.env.NODE_ENV === 'production') {
+        realPrisma = createPrismaClient();
+      } else {
+        if (!global.globalPrisma) {
+          global.globalPrisma = createPrismaClient();
+        }
+        realPrisma = global.globalPrisma;
+      }
+    }
+    return realPrisma[prop];
   }
-  prisma = global.globalPrisma;
-}
+});
 
-export { prisma };
-export default prisma;
+export { prismaProxy as prisma };
+export default prismaProxy;
