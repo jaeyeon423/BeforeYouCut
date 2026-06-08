@@ -1,67 +1,58 @@
 "use server";
 
 import { prisma } from "../utils/prisma";
-
-// Helper to ensure guest user exists in the database
-async function ensureGuestUser() {
-  return await prisma.user.upsert({
-    where: { id: "user_default" },
-    update: {},
-    create: {
-      id: "user_default",
-      email: "guest@beforeyoucut.com",
-      name: "게스트 사용자",
-      role: "BUYER",
-    },
-  });
-}
+import { createClient } from "../utils/supabase/server";
 
 /**
  * Fetch all sellers, products, and user-specific details (likes, follows, orders)
  * in a single roundtrip to hydrate the client.
  */
-export async function getInitialData(userId) {
+export async function getInitialData() {
   try {
-    const activeUserId = userId || "user_default";
-    
-    // Ensure the default guest exists if that's what we are using
-    if (activeUserId === "user_default") {
-      await ensureGuestUser();
-    }
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const activeUserId = user?.id || null;
 
     // Parallel fetch for optimal performance
-    const [dbSellers, dbProducts, userLikes, userFollows, userOrders] = await Promise.all([
+    const promises = [
       prisma.seller.findMany(),
       prisma.product.findMany(),
-      prisma.like.findMany({
-        where: { userId: activeUserId },
-        select: { productId: true },
-      }),
-      prisma.follow.findMany({
-        where: { userId: activeUserId },
-        select: { sellerId: true },
-      }),
-      prisma.order.findMany({
-        where: { userId: activeUserId },
-        orderBy: { date: "desc" },
-        include: {
-          items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  price: true,
-                  sellerId: true,
-                  icon: true,
-                  tone: true
+    ];
+
+    if (activeUserId) {
+      promises.push(
+        prisma.like.findMany({
+          where: { userId: activeUserId },
+          select: { productId: true },
+        }),
+        prisma.follow.findMany({
+          where: { userId: activeUserId },
+          select: { sellerId: true },
+        }),
+        prisma.order.findMany({
+          where: { userId: activeUserId },
+          orderBy: { date: "desc" },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    sellerId: true,
+                    icon: true,
+                    tone: true
+                  }
                 }
               }
             }
           }
-        }
-      }),
-    ]);
+        })
+      );
+    }
+
+    const [dbSellers, dbProducts, userLikes = [], userFollows = [], userOrders = []] = await Promise.all(promises);
 
     // Format sellers object to match the static data structure (id-keyed dictionary)
     const sellersMap = {};
@@ -139,11 +130,17 @@ export async function getInitialData(userId) {
 /**
  * Toggle like for a product
  */
-export async function toggleLike(userId, productId) {
+export async function toggleLike(productId) {
   try {
-    const activeUserId = userId || "user_default";
-    if (activeUserId === "user_default") {
-      await ensureGuestUser();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const activeUserId = user.id;
+
+    if (!productId || typeof productId !== 'string' || productId.trim() === '') {
+      throw new Error("올바르지 않은 상품 ID입니다.");
     }
 
     const existing = await prisma.like.findUnique({
@@ -179,18 +176,24 @@ export async function toggleLike(userId, productId) {
     }
   } catch (error) {
     console.error("Failed to toggle product like:", error);
-    throw new Error("상품 찜 처리에 실패했습니다.");
+    throw new Error(error.message || "상품 찜 처리에 실패했습니다.");
   }
 }
 
 /**
  * Toggle follow for a brand
  */
-export async function toggleFollow(userId, sellerId) {
+export async function toggleFollow(sellerId) {
   try {
-    const activeUserId = userId || "user_default";
-    if (activeUserId === "user_default") {
-      await ensureGuestUser();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const activeUserId = user.id;
+
+    if (!sellerId || typeof sellerId !== 'string' || sellerId.trim() === '') {
+      throw new Error("올바르지 않은 셀러 ID입니다.");
     }
 
     const existing = await prisma.follow.findUnique({
@@ -214,18 +217,42 @@ export async function toggleFollow(userId, sellerId) {
     }
   } catch (error) {
     console.error("Failed to toggle brand follow:", error);
-    throw new Error("브랜드 팔로우 처리에 실패했습니다.");
+    throw new Error(error.message || "브랜드 팔로우 처리에 실패했습니다.");
   }
 }
 
 /**
  * Create a new checkout order
  */
-export async function createOrder(userId, { name, address, total, items }) {
+export async function createOrder({ name, address, total, items }) {
   try {
-    const activeUserId = userId || "user_default";
-    if (activeUserId === "user_default") {
-      await ensureGuestUser();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const activeUserId = user.id;
+
+    // Input validations
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      throw new Error("수령인 이름은 필수 입력 항목입니다.");
+    }
+    if (!address || typeof address !== 'string' || address.trim() === '') {
+      throw new Error("배송지 주소는 필수 입력 항목입니다.");
+    }
+    if (total === undefined || typeof total !== 'number' || total <= 0) {
+      throw new Error("결제 금액은 0보다 커야 합니다.");
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("주문할 상품 목록이 비어 있습니다.");
+    }
+    for (const item of items) {
+      if (!item.id || typeof item.id !== 'string') {
+        throw new Error("올바르지 않은 상품 정보가 포함되어 있습니다.");
+      }
+      if (item.price === undefined || typeof item.price !== 'number' || item.price <= 0) {
+        throw new Error("올바르지 않은 상품 가격이 포함되어 있습니다.");
+      }
     }
 
     const order = await prisma.order.create({
@@ -258,25 +285,52 @@ export async function createOrder(userId, { name, address, total, items }) {
     };
   } catch (error) {
     console.error("Failed to create order:", error);
-    throw new Error("주문 및 결제 처리에 실패했습니다.");
+    throw new Error(error.message || "주문 및 결제 처리에 실패했습니다.");
   }
 }
 
 /**
  * Create a new Seller profile (onboarding)
  */
-export async function createSeller(userId, { sellerId, name, desc, category, story, notice, firstProduct }) {
+export async function createSeller({ sellerId, name, desc, category, story, notice, firstProduct }) {
   try {
-    const activeUserId = userId || "user_default";
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const activeUserId = authUser.id;
     
+    // Input validations
+    if (!sellerId || typeof sellerId !== 'string' || !/^[a-z0-9]{3,20}$/.test(sellerId)) {
+      throw new Error("셀러 ID는 3자 이상 20자 이하의 영문 소문자와 숫자만 사용할 수 있습니다.");
+    }
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      throw new Error("브랜드 이름은 필수 입력 항목입니다.");
+    }
+    if (name.length > 50) {
+      throw new Error("브랜드 이름은 50자 이하여야 합니다.");
+    }
+    if (!category || typeof category !== 'string' || category.trim() === '') {
+      throw new Error("카테고리는 필수 입력 항목입니다.");
+    }
+    
+    if (firstProduct) {
+      if (!firstProduct.name || typeof firstProduct.name !== 'string' || firstProduct.name.trim() === '') {
+        throw new Error("첫 상품명은 필수 입력 항목입니다.");
+      }
+      if (firstProduct.price === undefined || typeof firstProduct.price !== 'number' || firstProduct.price <= 0) {
+        throw new Error("올바르지 않은 상품 가격이 포함되어 있습니다.");
+      }
+    }
+
     // Ensure the specific User exists in the database
-    // If it's a guest or if we don't have this user, ensure it
     let user = await prisma.user.findUnique({ where: { id: activeUserId } });
     if (!user) {
       user = await prisma.user.create({
         data: {
           id: activeUserId,
-          email: `${sellerId}@beforeyoucut.com`,
+          email: authUser.email,
           name: name,
           role: "SELLER"
         }
@@ -350,20 +404,31 @@ export async function createSeller(userId, { sellerId, name, desc, category, sto
     };
   } catch (error) {
     console.error("Failed to onboard seller brand:", error);
-    throw new Error("브랜드 입점 신청에 실패했습니다.");
+    throw new Error(error.message || "브랜드 입점 신청에 실패했습니다.");
   }
 }
 
 /**
  * Synchronize a Supabase Auth user record into the custom User table
  */
-export async function syncUser({ id, email, name }) {
+export async function syncUser({ name } = {}) {
   try {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      throw new Error("인증되지 않은 사용자입니다.");
+    }
+    const id = authUser.id;
+    const email = authUser.email;
+
+    const dataUpdate = {};
+    if (name) {
+      dataUpdate.name = name;
+    }
+
     const user = await prisma.user.upsert({
       where: { id },
-      update: {
-        name: name || user?.name,
-      },
+      update: dataUpdate,
       create: {
         id,
         email,

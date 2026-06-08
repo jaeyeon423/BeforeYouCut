@@ -444,7 +444,13 @@ export function BagScreen({ ctx }) {
       </div>
       {items.length > 0 && (
         <div className="pd-buybar">
-          <button className="buy" onClick={() => setCheckoutOpen(true)}>{won(total)}원 · 주문하기</button>
+          <button className="buy" onClick={() => {
+            if (!ctx.user) {
+              ctx.showToast("로그인이 필요한 서비스입니다.");
+              return;
+            }
+            setCheckoutOpen(true);
+          }}>{won(total)}원 · 주문하기</button>
         </div>
       )}
 
@@ -548,8 +554,12 @@ export function MyScreen({ ctx }) {
     if (!brandName.trim()) return;
 
     setOnboardLoading(true);
+    const cleanBrandName = brandName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const slugPrefix = cleanBrandName || "brand";
+    const sellerId = (slugPrefix + Date.now().toString().slice(-4)).slice(0, 20);
+
     const onboardData = {
-      sellerId: brandName.replace(/\s+/g, '').toLowerCase() + "_" + Date.now().toString().slice(-4),
+      sellerId,
       name: brandName,
       desc: brandDesc,
       category: brandCategory,
@@ -672,7 +682,13 @@ export function MyScreen({ ctx }) {
       </div>
 
       {/* seller onboarding CTA */}
-      <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => setOnboardOpen(true)}>
+      <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => {
+        if (!ctx.user) {
+          ctx.showToast("로그인이 필요한 서비스입니다.");
+          return;
+        }
+        setOnboardOpen(true);
+      }}>
         <div className="bp-kicker">FOR SELLERS</div>
         <div className="bp-title">내 브랜드를<br/>입점시키기</div>
         <div className="bp-sub">미용인이라면 누구나 셀러가 될 수 있어요. 입점하고 상품을 등록해 보세요.</div>

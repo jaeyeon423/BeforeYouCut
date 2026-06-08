@@ -20,7 +20,8 @@ import {
   toggleLike, 
   toggleFollow, 
   createOrder, 
-  createSeller 
+  createSeller,
+  syncUser
 } from './actions';
 
 // Frozen production configurations
@@ -78,14 +79,14 @@ export default function Home() {
     toastTimerRef.current = setTimeout(() => setToast(null), 1600);
   }, []);
 
-  const loadData = useCallback(async (userId) => {
+  const loadData = useCallback(async () => {
     try {
-      const data = await getInitialData(userId);
+      const data = await getInitialData();
       setSellers(data.sellers);
       setProducts(data.products);
-      setLikes(new Set(data.likes));
-      setFollowing(new Set(data.following));
-      setOrders(data.orders);
+      setLikes(new Set(data.likes || []));
+      setFollowing(new Set(data.following || []));
+      setOrders(data.orders || []);
     } catch (e) {
       console.error(e);
       showToast("데이터를 불러오지 못했습니다.");
@@ -105,17 +106,23 @@ export default function Home() {
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const activeUser = session?.user || null;
       setUser(activeUser);
-      loadData(activeUser?.id);
+      if (activeUser) {
+        await syncUser({ name: activeUser.user_metadata?.name || activeUser.email.split("@")[0] });
+      }
+      loadData();
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const activeUser = session?.user || null;
       setUser(activeUser);
-      loadData(activeUser?.id);
+      if (activeUser) {
+        await syncUser({ name: activeUser.user_metadata?.name || activeUser.email.split("@")[0] });
+      }
+      loadData();
     });
 
     return () => {
@@ -168,7 +175,10 @@ export default function Home() {
     goNav,
     showToast,
     like: async (id) => {
-      const userId = user?.id || "user_default";
+      if (!user) {
+        showToast("로그인이 필요한 서비스입니다.");
+        return;
+      }
       // Optimistic update
       setLikes((s) => {
         const n = new Set(s);
@@ -176,7 +186,7 @@ export default function Home() {
         return n;
       });
       try {
-        await toggleLike(userId, id);
+        await toggleLike(id);
       } catch (e) {
         console.error(e);
         // Revert on error
@@ -189,7 +199,10 @@ export default function Home() {
       }
     },
     follow: async (id) => {
-      const userId = user?.id || "user_default";
+      if (!user) {
+        showToast("로그인이 필요한 서비스입니다.");
+        return;
+      }
       setFollowing((s) => {
         const n = new Set(s);
         if (n.has(id)) {
@@ -202,7 +215,7 @@ export default function Home() {
         return n;
       });
       try {
-        await toggleFollow(userId, id);
+        await toggleFollow(id);
       } catch (e) {
         console.error(e);
         // Revert on error
@@ -225,9 +238,12 @@ export default function Home() {
     removeCart: (i) => setCart((c) => c.filter((_, k) => k !== i)),
     clearCart: () => setCart([]),
     addOrder: async (orderData) => {
-      const userId = user?.id || "user_default";
+      if (!user) {
+        showToast("로그인이 필요한 서비스입니다.");
+        return false;
+      }
       try {
-        const res = await createOrder(userId, {
+        const res = await createOrder({
           name: orderData.buyer,
           address: orderData.address,
           total: orderData.total,
@@ -245,9 +261,12 @@ export default function Home() {
       }
     },
     addSeller: async (onboardData) => {
-      const userId = user?.id || "user_default";
+      if (!user) {
+        showToast("로그인이 필요한 서비스입니다.");
+        return false;
+      }
       try {
-        const res = await createSeller(userId, onboardData);
+        const res = await createSeller(onboardData);
         if (res.success) {
           setSellers((s) => ({
             ...s,
