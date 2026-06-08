@@ -1,8 +1,10 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import Icon from './icons';
-import { SELLERS, CAT_ICON, won } from '../data/data';
+import { CAT_ICON, won } from '../data/data';
+import { useApp } from '@/contexts/app-context';
 
 // ---------- product image placeholder ----------
 export function Placeholder({ icon = "scissors", tone = "tone-a", tag, size = 44 }) {
@@ -23,57 +25,20 @@ export function Wordmark() {
   );
 }
 
-// ---------- top bar ----------
-export function TopBar({ onNav, cart = 0, bordered, title }) {
-  return (
-    <div className={"topbar" + (bordered ? " bordered" : "")}>
-      {title ? <div className="wordmark" style={{ fontSize: 17 }}>{title}</div> : <Wordmark />}
-      <div className="topbar-actions">
-        <button className="icon-btn" onClick={() => onNav("search")} aria-label="검색"><Icon name="search" size={22} /></button>
-        <button className="icon-btn" aria-label="알림"><Icon name="bell" size={22} /><span className="dot" /></button>
-        <button className="icon-btn" onClick={() => onNav("bag")} aria-label="장바구니">
-          <Icon name="bag" size={22} />
-          {cart > 0 && <span className="dot" style={{ width: 7, height: 7 }} />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------- bottom tab nav ----------
-export const NAV_TABS = [
-  { key: "home", label: "홈", icon: "home" },
-  { key: "category", label: "카테고리", icon: "grid" },
-  { key: "search", label: "검색", icon: "search" },
-  { key: "saved", label: "저장", icon: "heart" },
-  { key: "my", label: "마이", icon: "user" },
-];
-
-export function BottomNav({ active, onNav }) {
-  return (
-    <div className="bottomnav">
-      {NAV_TABS.map((t) => {
-        const on = active === t.key || (t.key === "home" && active === "home");
-        return (
-          <button key={t.key} className={"navitem" + (on ? " active" : "")} onClick={() => onNav(t.key)}>
-            <Icon name={t.icon} size={23} fill={t.key === "saved" && on} stroke={on ? 1.9 : 1.7} />
-            <span>{t.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------- section header ----------
-export function SectionHeader({ title, sub, more, onMore }) {
+// ---------- section header (more → Link when href given, else button) ----------
+export function SectionHeader({ title, sub, more, href, onMore }) {
   return (
     <div className="section-head">
       <div>
         <h3 className="section-title">{title}</h3>
         {sub && <div className="section-sub">{sub}</div>}
       </div>
-      {more && <button className="section-more" onClick={onMore}>{more}<Icon name="chev-r-sm" size={14} /></button>}
+      {more && href && (
+        <Link href={href} className="section-more">{more}<Icon name="chev-r-sm" size={14} /></Link>
+      )}
+      {more && !href && onMore && (
+        <button className="section-more" onClick={onMore}>{more}<Icon name="chev-r-sm" size={14} /></button>
+      )}
     </div>
   );
 }
@@ -84,11 +49,22 @@ export function Verified({ size = 13 }) {
 }
 
 // ---------- product card (variants: minimal | meta | overlay) ----------
-export function ProductCard({ p, variant = "meta", onOpen, liked, onLike, sellers = SELLERS }) {
+// Navigation is a real <Link>; the like control is a span (role=button) so we
+// don't nest interactive <button> inside an <a>.
+export function ProductCard({ p, variant = "meta" }) {
+  const { sellers, likes, toggleLike } = useApp();
   const seller = sellers[p.seller] || { name: "알 수 없는 브랜드" };
+  const liked = likes.has(p.id);
+
+  const onLike = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleLike(p.id);
+  };
+
   if (variant === "overlay") {
     return (
-      <div className="pcard overlay" onClick={() => onOpen(p)}>
+      <Link href={`/products/${p.id}`} className="pcard overlay">
         <div className="pcard-media">
           <Placeholder icon={p.icon} tone={p.tone} />
           {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
@@ -98,17 +74,18 @@ export function ProductCard({ p, variant = "meta", onOpen, liked, onLike, seller
             <div className="ov-price">{p.disc ? <span style={{ color: "var(--accent)" }}>{p.disc}% </span> : null}{won(p.price)}원</div>
           </div>
         </div>
-      </div>
+      </Link>
     );
   }
+
   return (
-    <div className="pcard" onClick={() => onOpen(p)}>
+    <Link href={`/products/${p.id}`} className="pcard">
       <div className="pcard-media">
         <Placeholder icon={p.icon} tone={p.tone} />
         {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
-        <button className="pcard-like" onClick={(e) => { e.stopPropagation(); onLike && onLike(p.id); }} aria-label="찜">
+        <span className="pcard-like" role="button" tabIndex={0} onClick={onLike} aria-label="찜">
           <Icon name="heart" size={20} fill={liked} stroke={1.8} />
-        </button>
+        </span>
       </div>
       <div className="pcard-body">
         <div className="pcard-brand">{seller.name}{seller.verified && <Verified size={12} />}</div>
@@ -121,50 +98,51 @@ export function ProductCard({ p, variant = "meta", onOpen, liked, onLike, seller
           <div className="pcard-meta">
             <span className="star"><Icon name="star" size={11} />{p.rating}</span>
             <span>리뷰 {p.reviews}</span>
-            <span>♡ {p.likes.toLocaleString()}</span>
+            <span>♡ {(p.likes ?? 0).toLocaleString()}</span>
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
 // ---------- horizontal product rail ----------
-export function ProductRail({ items, variant, onOpen, likes, onLike, sellers = SELLERS }) {
+export function ProductRail({ items, variant }) {
   return (
     <div className="prow">
       {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} sellers={sellers} />
+        <ProductCard key={p.id} p={p} variant={variant} />
       ))}
     </div>
   );
 }
 
 // ---------- product grid ----------
-export function ProductGrid({ items, variant, onOpen, likes, onLike, sellers = SELLERS }) {
+export function ProductGrid({ items, variant }) {
   return (
     <div className="pgrid">
       {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} onOpen={onOpen} liked={likes?.has(p.id)} onLike={onLike} sellers={sellers} />
+        <ProductCard key={p.id} p={p} variant={variant} />
       ))}
     </div>
   );
 }
 
 // ---------- brand rail (stories-style) ----------
-export function BrandRail({ onOpenSeller, sellers = SELLERS }) {
+export function BrandRail() {
+  const { sellers } = useApp();
   const ids = Object.keys(sellers);
   return (
     <div className="brandrail">
       {ids.map((id) => {
         const s = sellers[id];
         return (
-          <div key={id} className="brandcell" onClick={() => onOpenSeller(id)}>
+          <Link key={id} href={`/sellers/${id}`} className="brandcell">
             <div className={"ring" + (s.products < 12 ? " new" : "")}>
               <div className="ring-inner"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={26} /></div>
             </div>
             <div className="bc-name">{s.name}</div>
-          </div>
+          </Link>
         );
       })}
     </div>
@@ -172,11 +150,19 @@ export function BrandRail({ onOpenSeller, sellers = SELLERS }) {
 }
 
 // ---------- brand spotlight card ----------
-export function BrandCard({ id, onOpenSeller, following, onFollow, sellers = SELLERS }) {
+export function BrandCard({ id }) {
+  const { sellers, following, toggleFollow } = useApp();
   const s = sellers[id] || { name: id, category: "도구", desc: "", followers: "0", tone: "tone-a" };
-  const isF = following?.has(id);
+  const isF = following.has(id);
+
+  const onFollow = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFollow(id);
+  };
+
   return (
-    <div className="brandcard" onClick={() => onOpenSeller(id)}>
+    <Link href={`/sellers/${id}`} className="brandcard">
       <div className="brandcard-cover"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={40} /></div>
       <div className="brandcard-foot">
         <div className="brandcard-logo"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={22} /></div>
@@ -184,10 +170,10 @@ export function BrandCard({ id, onOpenSeller, following, onFollow, sellers = SEL
           <div className="brandcard-name">{s.name}{s.verified && <Verified size={13} />}</div>
           <div className="brandcard-desc">{s.desc} · 팔로워 {s.followers}</div>
         </div>
-        <button className={"btn-follow" + (isF ? " on" : "")} onClick={(e) => { e.stopPropagation(); onFollow(id); }}>
+        <span className={"btn-follow" + (isF ? " on" : "")} role="button" tabIndex={0} onClick={onFollow}>
           {isF ? "팔로잉" : "+ 팔로우"}
-        </button>
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }

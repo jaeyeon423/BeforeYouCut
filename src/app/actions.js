@@ -3,127 +3,245 @@
 import { prisma } from "../utils/prisma";
 import { createClient } from "../utils/supabase/server";
 
+// ============================================================
+//  Internal formatters & helpers (not exported → not server actions)
+// ============================================================
+
+// Map a Prisma Seller row to the front-end shape (id-keyed friendly).
+function formatSeller(s) {
+  return {
+    id: s.id,
+    name: s.name,
+    verified: s.verified,
+    desc: s.desc,
+    category: s.category,
+    followers: s.followers,
+    products: s.productsCount,
+    since: s.since,
+    tone: s.tone,
+    story: s.story,
+    notice: s.notice,
+    userId: s.userId,
+  };
+}
+
+// Map a Prisma Product row to the front-end shape (sellerId → seller, likesCount → likes).
+function formatProduct(p) {
+  return {
+    id: p.id,
+    seller: p.sellerId,
+    name: p.name,
+    price: p.price,
+    cat: p.cat,
+    icon: p.icon,
+    tone: p.tone,
+    badge: p.badge,
+    disc: p.disc,
+    orig: p.orig,
+    rating: p.rating,
+    reviews: p.reviews,
+    likes: p.likesCount,
+    spec: p.spec,
+    desc: p.desc,
+  };
+}
+
+// Resolve the currently authenticated user id (or null) on the server.
+async function getAuthUserId() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
+const RANKING_IDS = ["p6", "p1", "p9", "p4", "p13"];
+const HANDMADE_CATS = ["핸드메이드", "앞치마·유니폼"];
+
+// ============================================================
+//  Page-scoped data fetching (public reads — no auth required)
+// ============================================================
+
 /**
- * Fetch all sellers, products, and user-specific details (likes, follows, orders)
- * in a single roundtrip to hydrate the client.
+ * All sellers as an id-keyed dictionary. Loaded once in the root layout so
+ * product/brand cards anywhere can resolve a seller name without refetching.
  */
-export async function getInitialData() {
+export async function getSellersMap() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const activeUserId = user?.id || null;
+    const dbSellers = await prisma.seller.findMany();
+    const map = {};
+    dbSellers.forEach((s) => { map[s.id] = formatSeller(s); });
+    return map;
+  } catch (error) {
+    console.error("Failed to load sellers map:", error);
+    return {};
+  }
+}
 
-    // Parallel fetch for optimal performance
-    const promises = [
-      prisma.seller.findMany(),
-      prisma.product.findMany(),
-    ];
+/**
+ * Data needed by the home screen only: ranking, new arrivals, handmade picks.
+ */
+export async function getHomeData() {
+  try {
+    const [rankingRows, newRows, handmadeRows] = await Promise.all([
+      prisma.product.findMany({ where: { id: { in: RANKING_IDS } } }),
+      prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
+      prisma.product.findMany({ where: { cat: { in: HANDMADE_CATS } }, take: 4 }),
+    ]);
 
-    if (activeUserId) {
-      promises.push(
-        prisma.like.findMany({
-          where: { userId: activeUserId },
-          select: { productId: true },
-        }),
-        prisma.follow.findMany({
-          where: { userId: activeUserId },
-          select: { sellerId: true },
-        }),
-        prisma.order.findMany({
-          where: { userId: activeUserId },
-          orderBy: { date: "desc" },
+    // Preserve the curated ranking order.
+    const byId = new Map(rankingRows.map((p) => [p.id, p]));
+    const ranking = RANKING_IDS.map((id) => byId.get(id)).filter(Boolean).map(formatProduct);
+
+    return {
+      ranking,
+      newItems: newRows.map(formatProduct),
+      handmade: handmadeRows.map(formatProduct),
+    };
+  } catch (error) {
+    console.error("Failed to load home data:", error);
+    return { ranking: [], newItems: [], handmade: [] };
+  }
+}
+
+/**
+ * A single product with its seller and up-to-4 related products from the
+ * same seller. Returns null when the product does not exist.
+ */
+export async function getProductDetail(productId) {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) return null;
+
+    const [seller, relatedRows] = await Promise.all([
+      prisma.seller.findUnique({ where: { id: product.sellerId } }),
+      prisma.product.findMany({
+        where: { sellerId: product.sellerId, id: { not: productId } },
+        take: 4,
+      }),
+    ]);
+
+    return {
+      product: formatProduct(product),
+      seller: seller ? formatSeller(seller) : null,
+      related: relatedRows.map(formatProduct),
+    };
+  } catch (error) {
+    console.error("Failed to load product detail:", error);
+    return null;
+  }
+}
+
+/**
+ * A seller profile with its full product list. Returns null when not found.
+ */
+export async function getSellerProfile(sellerId) {
+  try {
+    const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
+    if (!seller) return null;
+
+    const products = await prisma.product.findMany({ where: { sellerId } });
+    return {
+      seller: formatSeller(seller),
+      products: products.map(formatProduct),
+    };
+  } catch (error) {
+    console.error("Failed to load seller profile:", error);
+    return null;
+  }
+}
+
+/**
+ * Paginated products for a category. `cat === "전체"` returns everything.
+ * Returns { items, hasMore } so the client can drive a "더보기" button.
+ */
+export async function getCategoryProducts(cat = "전체", page = 0, limit = 20) {
+  try {
+    const where = cat && cat !== "전체" ? { cat } : {};
+    const skip = page * limit;
+    const [rows, count] = await Promise.all([
+      prisma.product.findMany({ where, skip, take: limit }),
+      prisma.product.count({ where }),
+    ]);
+    return {
+      items: rows.map(formatProduct),
+      hasMore: skip + rows.length < count,
+      total: count,
+    };
+  } catch (error) {
+    console.error("Failed to load category products:", error);
+    return { items: [], hasMore: false, total: 0 };
+  }
+}
+
+// ============================================================
+//  User-scoped data fetching (auth required → empty when guest)
+// ============================================================
+
+/**
+ * The current user's liked product ids and followed seller ids.
+ * Returns empty arrays for guests.
+ */
+export async function getUserInteractions() {
+  try {
+    const activeUserId = await getAuthUserId();
+    if (!activeUserId) return { likes: [], following: [] };
+
+    const [userLikes, userFollows] = await Promise.all([
+      prisma.like.findMany({ where: { userId: activeUserId }, select: { productId: true } }),
+      prisma.follow.findMany({ where: { userId: activeUserId }, select: { sellerId: true } }),
+    ]);
+
+    return {
+      likes: userLikes.map((l) => l.productId),
+      following: userFollows.map((f) => f.sellerId),
+    };
+  } catch (error) {
+    console.error("Failed to load user interactions:", error);
+    return { likes: [], following: [] };
+  }
+}
+
+/**
+ * The current user's order history (newest first). Empty for guests.
+ */
+export async function getUserOrders() {
+  try {
+    const activeUserId = await getAuthUserId();
+    if (!activeUserId) return [];
+
+    const userOrders = await prisma.order.findMany({
+      where: { userId: activeUserId },
+      orderBy: { date: "desc" },
+      include: {
+        items: {
           include: {
-            items: {
-              include: {
-                product: {
-                  select: {
-                    id: true,
-                    name: true,
-                    price: true,
-                    sellerId: true,
-                    icon: true,
-                    tone: true
-                  }
-                }
-              }
-            }
-          }
-        })
-      );
-    }
-
-    const [dbSellers, dbProducts, userLikes = [], userFollows = [], userOrders = []] = await Promise.all(promises);
-
-    // Format sellers object to match the static data structure (id-keyed dictionary)
-    const sellersMap = {};
-    dbSellers.forEach((s) => {
-      sellersMap[s.id] = {
-        id: s.id,
-        name: s.name,
-        verified: s.verified,
-        desc: s.desc,
-        category: s.category,
-        followers: s.followers,
-        since: s.since,
-        tone: s.tone,
-        story: s.story,
-        notice: s.notice,
-        userId: s.userId,
-      };
+            product: {
+              select: { id: true, name: true, price: true, sellerId: true, icon: true, tone: true },
+            },
+          },
+        },
+      },
     });
 
-    // Format products list to match front-end structure (remap sellerId -> seller)
-    const formattedProducts = dbProducts.map((p) => ({
-      id: p.id,
-      seller: p.sellerId,
-      name: p.name,
-      price: p.price,
-      cat: p.cat,
-      icon: p.icon,
-      tone: p.tone,
-      badge: p.badge,
-      disc: p.disc,
-      orig: p.orig,
-      rating: p.rating,
-      reviews: p.reviews,
-      likes: p.likesCount,
-      spec: p.spec,
-      desc: p.desc,
-    }));
-
-    // Format user-specific likes/follows as arrays of keys
-    const likesArray = userLikes.map((l) => l.productId);
-    const followsArray = userFollows.map((f) => f.sellerId);
-
-    // Format orders array
-    const formattedOrders = userOrders.map(o => ({
+    return userOrders.map((o) => ({
       id: o.id,
       total: o.total,
       status: o.status,
       date: o.date.toLocaleDateString("ko-KR"),
       address: o.address,
       buyer: o.name,
-      items: o.items.map(i => ({
+      items: o.items.map((i) => ({
         id: i.productId,
         name: i.product.name,
         price: i.price,
         seller: i.product.sellerId,
         icon: i.product.icon,
         tone: i.product.tone,
-        quantity: i.quantity
-      }))
+        quantity: i.quantity,
+      })),
     }));
-
-    return {
-      sellers: sellersMap,
-      products: formattedProducts,
-      likes: likesArray,
-      following: followsArray,
-      orders: formattedOrders,
-    };
   } catch (error) {
-    console.error("Failed to load initial database data:", error);
-    throw new Error("데이터베이스 초기 적재에 실패했습니다.");
+    console.error("Failed to load user orders:", error);
+    return [];
   }
 }
 
