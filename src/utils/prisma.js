@@ -21,7 +21,9 @@ const createPrismaClient = () => {
   }
   
   // Clean connection string (remove quotes)
-  const cleanUrl = connectionString.replace(/^["']|["']$/g, '');
+  let cleanUrl = connectionString.replace(/^["']|["']$/g, '');
+  // Remove sslmode parameter to prevent node-postgres from overriding our custom ssl options
+  cleanUrl = cleanUrl.replace(/[?&]sslmode=[^&]*/, '');
   
   const pool = new Pool({
     connectionString: cleanUrl,
