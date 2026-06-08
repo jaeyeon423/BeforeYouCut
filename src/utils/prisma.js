@@ -24,8 +24,15 @@ const createPrismaClient = () => {
   
   // Clean connection string (remove quotes)
   let cleanUrl = connectionString.replace(/^["']|["']$/g, '');
-  // Remove sslmode parameter to prevent node-postgres from overriding our custom ssl options
-  cleanUrl = cleanUrl.replace(/[?&]sslmode=[^&]*/, '');
+  
+  // Safely parse URL to modify query parameters without breaking query syntax
+  try {
+    const parsedUrl = new URL(cleanUrl);
+    parsedUrl.searchParams.delete('sslmode');
+    cleanUrl = parsedUrl.toString();
+  } catch (e) {
+    console.error("Failed to parse database connection URL:", e);
+  }
   
   const pool = new Pool({
     connectionString: cleanUrl,
