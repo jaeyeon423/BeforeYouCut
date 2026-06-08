@@ -295,7 +295,7 @@ export default function Home() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: '#f1f1f2',
       display: 'flex',
       justifyContent: 'center',
@@ -305,7 +305,7 @@ export default function Home() {
         position: 'relative',
         width: '100%',
         maxWidth: '480px',
-        height: '100vh',
+        height: '100dvh',
         background: 'var(--paper)',
         boxShadow: '0 0 20px rgba(0,0,0,0.06)',
         display: 'flex',

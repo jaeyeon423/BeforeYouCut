@@ -139,7 +139,7 @@
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--line);
-  padding: 8px 6px 30px;
+  padding: 8px 6px calc(10px + env(safe-area-inset-bottom, 14px));
 }
 .navitem {
   flex: 1; background: none; border: none; cursor: pointer;
@@ -445,7 +445,7 @@
 /* sticky purchase bar */
 .pd-buybar {
   flex-shrink: 0; display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px 26px; background: var(--paper); border-top: 1px solid var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 12px)); background: var(--paper); border-top: 1px solid var(--line);
 }
 .pd-buybar .like-box {
   width: 48px; height: 48px; border: 1px solid var(--line-strong); border-radius: var(--radius);
