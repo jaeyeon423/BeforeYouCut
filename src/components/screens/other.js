@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Icon from '../icons';
+import { createClient } from '../../utils/supabase/client';
 import { 
   Placeholder, 
   SectionHeader, 
@@ -387,34 +388,34 @@ export function BagScreen({ ctx }) {
   const total = items.reduce((a, p) => a + p.price, 0);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [buyerName, setBuyerName] = useState("김미용");
+  const [buyerName, setBuyerName] = useState(ctx.user?.name || "김미용");
   const [buyerPhone, setBuyerPhone] = useState("010-1234-5678");
   const [shippingAddress, setShippingAddress] = useState("");
   const [payMethod, setPayMethod] = useState("카드결제");
+  const [loading, setLoading] = useState(false);
 
-  const handleCheckoutSubmit = (e) => {
+  const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (!shippingAddress.trim()) {
       alert("배송지를 입력해 주세요.");
       return;
     }
     
-    // Create new order record
-    const newOrder = {
-      id: "BYC-" + Math.floor(Math.random() * 900000 + 100000),
+    setLoading(true);
+    const orderData = {
       items: items.map(p => ({ id: p.id, name: p.name, price: p.price, seller: p.seller, icon: p.icon, tone: p.tone })),
       total: total,
-      date: new Date().toLocaleDateString("ko-KR"),
-      status: "배송 준비중",
       buyer: buyerName,
       address: shippingAddress,
       payment: payMethod
     };
 
-    ctx.addOrder(newOrder);
-    ctx.clearCart();
-    ctx.showToast("주문 및 결제가 완료되었습니다!");
-    setCheckoutOpen(false);
+    const success = await ctx.addOrder(orderData);
+    setLoading(false);
+    if (success) {
+      ctx.clearCart();
+      setCheckoutOpen(false);
+    }
   };
 
   return (
@@ -459,7 +460,7 @@ export function BagScreen({ ctx }) {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>주문 / 결제하기</h3>
-              <button className="icon-btn" onClick={() => setCheckoutOpen(false)}><Icon name="close" size={20} /></button>
+              <button className="icon-btn" onClick={() => setCheckoutOpen(false)} disabled={loading}><Icon name="close" size={20} /></button>
             </div>
             
             <form onSubmit={handleCheckoutSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -467,16 +468,16 @@ export function BagScreen({ ctx }) {
                 <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>주문자 정보</label>
                 <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                   <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
-                    value={buyerName} onChange={e => setBuyerName(e.target.value)} required placeholder="이름" />
+                    value={buyerName} onChange={e => setBuyerName(e.target.value)} required placeholder="이름" disabled={loading} />
                   <input className="searchbar" style={{ margin: 0, flex: 1, padding: 10, borderRadius: 6, fontSize: 13 }}
-                    value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} required placeholder="연락처" />
+                    value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} required placeholder="연락처" disabled={loading} />
                 </div>
               </div>
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>배송지 주소</label>
                 <input className="searchbar" style={{ margin: "6px 0 0", width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
-                  value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} required placeholder="배송지 주소를 상세히 입력해 주세요." />
+                  value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} required placeholder="배송지 주소를 상세히 입력해 주세요." disabled={loading} />
               </div>
 
               <div>
@@ -485,6 +486,7 @@ export function BagScreen({ ctx }) {
                   {["카드결제", "토스페이", "카카오페이"].map(m => (
                     <button key={m} type="button" 
                       onClick={() => setPayMethod(m)}
+                      disabled={loading}
                       style={{
                         flex: 1, padding: "10px 0", fontSize: 12.5, fontWeight: 600,
                         border: payMethod === m ? "1.5px solid var(--ink)" : "1px solid var(--line)",
@@ -502,7 +504,9 @@ export function BagScreen({ ctx }) {
                   <span style={{ fontSize: 13, color: "var(--ink-soft)", fontWeight: 600 }}>총 결제 금액</span>
                   <span style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{won(total)}원</span>
                 </div>
-                <button className="buy" type="submit" style={{ width: "100%" }}>결제하기</button>
+                <button className="buy" type="submit" style={{ width: "100%" }} disabled={loading}>
+                  {loading ? "결제 진행 중..." : "결제하기"}
+                </button>
               </div>
             </form>
           </div>
@@ -521,6 +525,14 @@ export function MyScreen({ ctx }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
 
+  // Auth States
+  const [authOpen, setAuthOpen] = useState(null); // 'signin' | 'signup' | null
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const supabase = createClient();
+
   // Onboarding Form States
   const [brandName, setBrandName] = useState("");
   const [brandCategory, setBrandCategory] = useState("도구");
@@ -529,73 +541,115 @@ export function MyScreen({ ctx }) {
   const [brandStory, setBrandStory] = useState("");
   const [prodName, setProdName] = useState("");
   const [prodPrice, setProdPrice] = useState("");
+  const [onboardLoading, setOnboardLoading] = useState(false);
 
-  const handleOnboardSubmit = (e) => {
+  const handleOnboardSubmit = async (e) => {
     e.preventDefault();
     if (!brandName.trim()) return;
 
-    const newBrandId = "seller_" + Date.now();
-    const newBrand = {
-      id: newBrandId,
+    setOnboardLoading(true);
+    const onboardData = {
+      sellerId: brandName.replace(/\s+/g, '').toLowerCase() + "_" + Date.now().toString().slice(-4),
       name: brandName,
-      verified: false,
-      desc: brandDesc || `${brandCategory} 전문 셀러`,
+      desc: brandDesc,
       category: brandCategory,
-      followers: "0",
-      products: prodName ? 1 : 0,
-      since: new Date().getFullYear().toString(),
-      tone: "tone-a",
-      story: brandStory ? [brandStory] : ["신규 입점 브랜드 스토리입니다."],
-      notice: brandNotice || null
+      story: brandStory,
+      notice: brandNotice,
+      firstProduct: prodName ? { name: prodName, price: Number(prodPrice) } : null
     };
 
-    ctx.addSeller(newBrand);
-
-    if (prodName && prodPrice) {
-      const newProductId = "p_" + Date.now();
-      const newProduct = {
-        id: newProductId,
-        seller: newBrandId,
-        name: prodName,
-        price: Number(prodPrice) || 10000,
-        cat: brandCategory,
-        icon: CAT_ICON[brandCategory] || "scissors",
-        tone: "tone-a",
-        badge: "new",
-        disc: null,
-        orig: null,
-        rating: 5.0,
-        reviews: 0,
-        likes: 0,
-        spec: [["입점일", new Date().toLocaleDateString("ko-KR")]],
-        desc: `${prodName} 설명입니다.`
-      };
-      ctx.addProduct(newProduct);
+    const success = await ctx.addSeller(onboardData);
+    setOnboardLoading(false);
+    if (success) {
+      // Clear forms
+      setBrandName("");
+      setBrandDesc("");
+      setBrandNotice("");
+      setBrandStory("");
+      setProdName("");
+      setProdPrice("");
+      setOnboardOpen(false);
     }
+  };
 
-    ctx.showToast("브랜드 입점 신청이 완료되었습니다!");
-    
-    // Clear forms
-    setBrandName("");
-    setBrandDesc("");
-    setBrandNotice("");
-    setBrandStory("");
-    setProdName("");
-    setProdPrice("");
-    setOnboardOpen(false);
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    if (!authEmail || !authPassword) return;
+
+    setAuthLoading(true);
+    if (authOpen === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+        options: {
+          data: {
+            name: authEmail.split("@")[0]
+          }
+        }
+      });
+      setAuthLoading(false);
+      if (error) {
+        alert("회원가입 에러: " + error.message);
+      } else {
+        ctx.showToast("회원가입이 완료되었습니다. 로그인해 주세요.");
+        setAuthOpen("signin");
+      }
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+      setAuthLoading(false);
+      if (error) {
+        alert("로그인 에러: " + error.message);
+      } else {
+        ctx.showToast("로그인에 성공했습니다!");
+        setAuthOpen(null);
+        setAuthEmail("");
+        setAuthPassword("");
+      }
+    }
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      alert("로그아웃 에러: " + error.message);
+    } else {
+      ctx.showToast("로그아웃되었습니다.");
+    }
   };
 
   return (
     <div className="byc-scroll fadein" key="my">
-      <div style={{ padding: "26px 18px 6px", display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
-          <Icon name="user" size={30} />
+      {ctx.user ? (
+        <div style={{ padding: "26px 18px 6px", display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
+            <Icon name="user" size={30} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>{ctx.user.email.split('@')[0]} 님</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>일반회원 · {ctx.user.email}</div>
+          </div>
+          <button className="btn-ghost" style={{ padding: "6px 12px", fontSize: 11, background: "none", border: "1px solid var(--line)" }} onClick={handleSignOut}>로그아웃</button>
         </div>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>김미용 디자이너</div>
-          <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>일반회원 · 팔로잉 {following.size}</div>
+      ) : (
+        <div style={{ padding: "26px 18px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
+              <Icon name="user" size={30} />
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>게스트 사용자</div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>로그인 시 나만의 정보를 연동합니다.</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            <button className="buy" style={{ flex: 1, padding: "10px 0", height: "auto", fontSize: 13 }} onClick={() => setAuthOpen("signin")}>로그인</button>
+            <button className="btn-ghost" style={{ flex: 1, padding: "10px 0", height: "auto", fontSize: 13, border: "1px solid var(--line)" }} onClick={() => setAuthOpen("signup")}>회원가입</button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{ display: "flex", margin: "18px", border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
         {[
@@ -801,6 +855,54 @@ export function MyScreen({ ctx }) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {authOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "flex-end"
+        }}>
+          <div className="fadein" style={{
+            width: "100%", background: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "24px 18px 30px", boxSizing: "border-box"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+                {authOpen === "signin" ? "로그인" : "회원가입"}
+              </h3>
+              <button className="icon-btn" onClick={() => setAuthOpen(null)} disabled={authLoading}><Icon name="close" size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>이메일 주소</label>
+                <input className="searchbar" style={{ margin: "6px 0 0", width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
+                  type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} required placeholder="email@example.com" disabled={authLoading} />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>비밀번호 (6자 이상)</label>
+                <input className="searchbar" style={{ margin: "6px 0 0", width: "100%", padding: 10, borderRadius: 6, fontSize: 13 }}
+                  type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} required placeholder="••••••••" disabled={authLoading} minLength={6} />
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <button className="buy" type="submit" style={{ width: "100%" }} disabled={authLoading}>
+                  {authLoading ? "처리 중..." : authOpen === "signin" ? "로그인하기" : "가입하기"}
+                </button>
+              </div>
+
+              <div style={{ textAlign: "center", marginTop: 10, fontSize: 12.5, color: "var(--ink-soft)" }}>
+                {authOpen === "signin" ? (
+                  <span>계정이 없으신가요? <button type="button" style={{ background: "none", border: "none", color: "var(--ink)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }} onClick={() => setAuthOpen("signup")}>회원가입</button></span>
+                ) : (
+                  <span>이미 계정이 있으신가요? <button type="button" style={{ background: "none", border: "none", color: "var(--ink)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }} onClick={() => setAuthOpen("signin")}>로그인</button></span>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}

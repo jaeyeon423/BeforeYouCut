@@ -14,6 +14,14 @@ import {
   BagScreen 
 } from '../components/screens/other';
 import { SELLERS as staticSellers, PRODUCTS as staticProducts } from '../data/data';
+import { createClient } from '../utils/supabase/client';
+import { 
+  getInitialData, 
+  toggleLike, 
+  toggleFollow, 
+  createOrder, 
+  createSeller 
+} from './actions';
 
 // Frozen production configurations
 const CONFIG = {
@@ -51,81 +59,78 @@ export default function Home() {
   const [tab, setTab] = useState("home");
   const [stack, setStack] = useState([]);          // overlay screens stack
   const [likes, setLikes] = useState(new Set());
-  const [following, setFollowing] = useState(new Set(["steelgrain"]));
+  const [following, setFollowing] = useState(new Set());
   const [cart, setCart] = useState([]);
   const [sellers, setSellers] = useState(staticSellers);
   const [products, setProducts] = useState(staticProducts);
   const [orders, setOrders] = useState([]);
   const [toast, setToast] = useState(null);
   
+  const [user, setUser] = useState(null);          // Supabase Auth User object
   const [mounted, setMounted] = useState(false);
   const toastTimerRef = useRef(null);
 
-  // Load from localStorage on client-mount
-  useEffect(() => {
-    setMounted(true);
-    try {
-      const savedLikes = localStorage.getItem('byc_likes');
-      if (savedLikes) setLikes(new Set(JSON.parse(savedLikes)));
-
-      const savedFollowing = localStorage.getItem('byc_following');
-      if (savedFollowing) setFollowing(new Set(JSON.parse(savedFollowing)));
-
-      const savedCart = localStorage.getItem('byc_cart');
-      if (savedCart) setCart(JSON.parse(savedCart));
-
-      const savedSellers = localStorage.getItem('byc_sellers');
-      if (savedSellers) setSellers(JSON.parse(savedSellers));
-
-      const savedProducts = localStorage.getItem('byc_products');
-      if (savedProducts) setProducts(JSON.parse(savedProducts));
-
-      const savedOrders = localStorage.getItem('byc_orders');
-      if (savedOrders) setOrders(JSON.parse(savedOrders));
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
-  // Sync state changes to localStorage
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_likes', JSON.stringify(Array.from(likes)));
-  }, [likes, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_following', JSON.stringify(Array.from(following)));
-  }, [following, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_cart', JSON.stringify(cart));
-  }, [cart, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_sellers', JSON.stringify(sellers));
-  }, [sellers, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_products', JSON.stringify(products));
-  }, [products, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('byc_orders', JSON.stringify(orders));
-  }, [orders, mounted]);
-
-  const scrollKey = tab + "|" + stack.map((s) => s.kind + (s.sid || s.p?.id || "")).join(">");
-  const top = stack[stack.length - 1];
+  const supabase = createClient();
 
   const showToast = useCallback((msg) => {
     setToast(msg);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 1600);
   }, []);
+
+  const loadData = useCallback(async (userId) => {
+    try {
+      const data = await getInitialData(userId);
+      setSellers(data.sellers);
+      setProducts(data.products);
+      setLikes(new Set(data.likes));
+      setFollowing(new Set(data.following));
+      setOrders(data.orders);
+    } catch (e) {
+      console.error(e);
+      showToast("데이터를 불러오지 못했습니다.");
+    }
+  }, [showToast]);
+
+  // Load from database & auth listener on mount
+  useEffect(() => {
+    setMounted(true);
+    
+    // Load local cart
+    try {
+      const savedCart = localStorage.getItem('byc_cart');
+      if (savedCart) setCart(JSON.parse(savedCart));
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const activeUser = session?.user || null;
+      setUser(activeUser);
+      loadData(activeUser?.id);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const activeUser = session?.user || null;
+      setUser(activeUser);
+      loadData(activeUser?.id);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth, loadData]);
+
+  // Sync cart state changes to localStorage
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('byc_cart', JSON.stringify(cart));
+  }, [cart, mounted]);
+
+  const scrollKey = tab + "|" + stack.map((s) => s.kind + (s.sid || s.p?.id || "")).join(">");
+  const top = stack[stack.length - 1];
 
   const byId = useCallback((id) => products.find((x) => x.id === id), [products]);
   const bySeller = useCallback((sid) => products.filter((x) => x.seller === sid), [products]);
@@ -149,6 +154,7 @@ export default function Home() {
     openSeller: (sid) => setStack((s) => [...s, { kind: "seller", sid }]),
     openBag: () => setStack((s) => [...s, { kind: "bag" }]),
     back: () => setStack((s) => s.slice(0, -1)),
+    user,
     likes, 
     following, 
     cart,
@@ -161,30 +167,104 @@ export default function Home() {
     byId,
     goNav,
     showToast,
-    like: (id) => setLikes((s) => { 
-      const n = new Set(s); 
-      n.has(id) ? n.delete(id) : n.add(id); 
-      return n; 
-    }),
-    follow: (id) => setFollowing((s) => { 
-      const n = new Set(s); 
-      if (n.has(id)) { 
-        n.delete(id); 
-        showToast("팔로우를 취소했어요"); 
-      } else { 
-        n.add(id); 
-        showToast("브랜드를 팔로우했어요"); 
-      } 
-      return n; 
-    }),
+    like: async (id) => {
+      const userId = user?.id || "user_default";
+      // Optimistic update
+      setLikes((s) => {
+        const n = new Set(s);
+        n.has(id) ? n.delete(id) : n.add(id);
+        return n;
+      });
+      try {
+        await toggleLike(userId, id);
+      } catch (e) {
+        console.error(e);
+        // Revert on error
+        setLikes((s) => {
+          const n = new Set(s);
+          n.has(id) ? n.delete(id) : n.add(id);
+          return n;
+        });
+        showToast("오류가 발생했습니다.");
+      }
+    },
+    follow: async (id) => {
+      const userId = user?.id || "user_default";
+      setFollowing((s) => {
+        const n = new Set(s);
+        if (n.has(id)) {
+          n.delete(id);
+          showToast("팔로우를 취소했어요");
+        } else {
+          n.add(id);
+          showToast("브랜드를 팔로우했어요");
+        }
+        return n;
+      });
+      try {
+        await toggleFollow(userId, id);
+      } catch (e) {
+        console.error(e);
+        // Revert on error
+        setFollowing((s) => {
+          const n = new Set(s);
+          if (n.has(id)) {
+            n.delete(id);
+          } else {
+            n.add(id);
+          }
+          return n;
+        });
+        showToast("오류가 발생했습니다.");
+      }
+    },
     addCart: (p) => { 
       setCart((c) => [...c, p]); 
       showToast("장바구니에 담았어요"); 
     },
     removeCart: (i) => setCart((c) => c.filter((_, k) => k !== i)),
     clearCart: () => setCart([]),
-    addOrder: (newOrder) => setOrders((o) => [newOrder, ...o]),
-    addSeller: (newSeller) => setSellers((s) => ({ ...s, [newSeller.id]: newSeller })),
+    addOrder: async (orderData) => {
+      const userId = user?.id || "user_default";
+      try {
+        const res = await createOrder(userId, {
+          name: orderData.buyer,
+          address: orderData.address,
+          total: orderData.total,
+          items: orderData.items
+        });
+        if (res.success) {
+          setOrders((o) => [res.order, ...o]);
+          showToast("주문 및 결제가 완료되었습니다!");
+          return true;
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("결제 처리에 실패했습니다.");
+        return false;
+      }
+    },
+    addSeller: async (onboardData) => {
+      const userId = user?.id || "user_default";
+      try {
+        const res = await createSeller(userId, onboardData);
+        if (res.success) {
+          setSellers((s) => ({
+            ...s,
+            [res.seller.id]: res.seller
+          }));
+          if (res.product) {
+            setProducts((p) => [res.product, ...p]);
+          }
+          showToast("브랜드 입점 신청이 완료되었습니다!");
+          return true;
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("입점 신청에 실패했습니다.");
+        return false;
+      }
+    },
     addProduct: (newProduct) => setProducts((p) => [newProduct, ...p]),
   };
 
