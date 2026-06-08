@@ -7,11 +7,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const connectionString =
-  process.env.DIRECT_URL ||
-  process.env.POSTGRES_URL_NON_POOLING ||
   process.env.DATABASE_URL ||
   process.env.POSTGRES_PRISMA_URL ||
-  process.env.POSTGRES_URL;
+  process.env.POSTGRES_URL ||
+  process.env.DIRECT_URL ||
+  process.env.POSTGRES_URL_NON_POOLING;
 
 let realPrisma = null;
 
@@ -29,6 +29,7 @@ const createPrismaClient = () => {
   
   const pool = new Pool({
     connectionString: cleanUrl,
+    max: 4, // Prevent connection exhaustion on Supabase Free Plan
     ssl: {
       rejectUnauthorized: false,
     },
