@@ -3,7 +3,6 @@ import { OverlayHeader } from "@/components/nav";
 import { DetailScreen } from "@/components/screens/other";
 import { getProductDetail } from "@/app/actions";
 
-export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;

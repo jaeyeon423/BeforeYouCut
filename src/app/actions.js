@@ -2,6 +2,8 @@
 
 import { prisma } from "../utils/prisma";
 import { createClient } from "../utils/supabase/server";
+import { unstable_cache, revalidateTag } from "next/cache";
+import { cache } from "react";
 
 // ============================================================
 //  Internal formatters & helpers (not exported → not server actions)
@@ -64,113 +66,143 @@ const HANDMADE_CATS = ["핸드메이드", "앞치마·유니폼"];
  * All sellers as an id-keyed dictionary. Loaded once in the root layout so
  * product/brand cards anywhere can resolve a seller name without refetching.
  */
-export async function getSellersMap() {
-  try {
-    const dbSellers = await prisma.seller.findMany();
-    const map = {};
-    dbSellers.forEach((s) => { map[s.id] = formatSeller(s); });
-    return map;
-  } catch (error) {
-    console.error("Failed to load sellers map:", error);
-    return {};
-  }
-}
+export const getSellersMap = cache(() => {
+  return unstable_cache(
+    async () => {
+      try {
+        const dbSellers = await prisma.seller.findMany();
+        const map = {};
+        dbSellers.forEach((s) => { map[s.id] = formatSeller(s); });
+        return map;
+      } catch (error) {
+        console.error("Failed to load sellers map:", error);
+        return {};
+      }
+    },
+    ["sellers-map"],
+    { revalidate: 600, tags: ["sellers"] }
+  )();
+});
 
 /**
  * Data needed by the home screen only: ranking, new arrivals, handmade picks.
  */
-export async function getHomeData() {
-  try {
-    const [rankingRows, newRows, handmadeRows] = await Promise.all([
-      prisma.product.findMany({ where: { id: { in: RANKING_IDS } } }),
-      prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
-      prisma.product.findMany({ where: { cat: { in: HANDMADE_CATS } }, take: 4 }),
-    ]);
+export const getHomeData = cache(() => {
+  return unstable_cache(
+    async () => {
+      try {
+        const [rankingRows, newRows, handmadeRows] = await Promise.all([
+          prisma.product.findMany({ where: { id: { in: RANKING_IDS } } }),
+          prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
+          prisma.product.findMany({ where: { cat: { in: HANDMADE_CATS } }, take: 4 }),
+        ]);
 
-    // Preserve the curated ranking order.
-    const byId = new Map(rankingRows.map((p) => [p.id, p]));
-    const ranking = RANKING_IDS.map((id) => byId.get(id)).filter(Boolean).map(formatProduct);
+        // Preserve the curated ranking order.
+        const byId = new Map(rankingRows.map((p) => [p.id, p]));
+        const ranking = RANKING_IDS.map((id) => byId.get(id)).filter(Boolean).map(formatProduct);
 
-    return {
-      ranking,
-      newItems: newRows.map(formatProduct),
-      handmade: handmadeRows.map(formatProduct),
-    };
-  } catch (error) {
-    console.error("Failed to load home data:", error);
-    return { ranking: [], newItems: [], handmade: [] };
-  }
-}
+        return {
+          ranking,
+          newItems: newRows.map(formatProduct),
+          handmade: handmadeRows.map(formatProduct),
+        };
+      } catch (error) {
+        console.error("Failed to load home data:", error);
+        return { ranking: [], newItems: [], handmade: [] };
+      }
+    },
+    ["home-data"],
+    { revalidate: 300, tags: ["home"] }
+  )();
+});
 
 /**
  * A single product with its seller and up-to-4 related products from the
  * same seller. Returns null when the product does not exist.
  */
-export async function getProductDetail(productId) {
-  try {
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) return null;
+export const getProductDetail = cache((productId) => {
+  return unstable_cache(
+    async () => {
+      try {
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        if (!product) return null;
 
-    const [seller, relatedRows] = await Promise.all([
-      prisma.seller.findUnique({ where: { id: product.sellerId } }),
-      prisma.product.findMany({
-        where: { sellerId: product.sellerId, id: { not: productId } },
-        take: 4,
-      }),
-    ]);
+        const [seller, relatedRows] = await Promise.all([
+          prisma.seller.findUnique({ where: { id: product.sellerId } }),
+          prisma.product.findMany({
+            where: { sellerId: product.sellerId, id: { not: productId } },
+            take: 4,
+          }),
+        ]);
 
-    return {
-      product: formatProduct(product),
-      seller: seller ? formatSeller(seller) : null,
-      related: relatedRows.map(formatProduct),
-    };
-  } catch (error) {
-    console.error("Failed to load product detail:", error);
-    return null;
-  }
-}
+        return {
+          product: formatProduct(product),
+          seller: seller ? formatSeller(seller) : null,
+          related: relatedRows.map(formatProduct),
+        };
+      } catch (error) {
+        console.error("Failed to load product detail:", error);
+        return null;
+      }
+    },
+    ["product-detail", productId],
+    { revalidate: 600, tags: ["products", `product-${productId}`] }
+  )();
+});
 
 /**
  * A seller profile with its full product list. Returns null when not found.
  */
-export async function getSellerProfile(sellerId) {
-  try {
-    const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
-    if (!seller) return null;
+export const getSellerProfile = cache((sellerId) => {
+  return unstable_cache(
+    async () => {
+      try {
+        const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
+        if (!seller) return null;
 
-    const products = await prisma.product.findMany({ where: { sellerId } });
-    return {
-      seller: formatSeller(seller),
-      products: products.map(formatProduct),
-    };
-  } catch (error) {
-    console.error("Failed to load seller profile:", error);
-    return null;
-  }
-}
+        const products = await prisma.product.findMany({ where: { sellerId } });
+        return {
+          seller: formatSeller(seller),
+          products: products.map(formatProduct),
+        };
+      } catch (error) {
+        console.error("Failed to load seller profile:", error);
+        return null;
+      }
+    },
+    ["seller-profile", sellerId],
+    { revalidate: 600, tags: ["sellers", `seller-${sellerId}`] }
+  )();
+});
 
 /**
  * Paginated products for a category. `cat === "전체"` returns everything.
  * Returns { items, hasMore } so the client can drive a "더보기" button.
  */
-export async function getCategoryProducts(cat = "전체", page = 0, limit = 20) {
-  try {
-    const where = cat && cat !== "전체" ? { cat } : {};
-    const skip = page * limit;
-    const [rows, count] = await Promise.all([
-      prisma.product.findMany({ where, skip, take: limit }),
-      prisma.product.count({ where }),
-    ]);
-    return {
-      items: rows.map(formatProduct),
-      hasMore: skip + rows.length < count,
-      total: count,
-    };
-  } catch (error) {
-    console.error("Failed to load category products:", error);
-    return { items: [], hasMore: false, total: 0 };
-  }
-}
+export const getCategoryProducts = cache((cat = "전체", page = 0, limit = 20) => {
+  return unstable_cache(
+    async () => {
+      try {
+        const where = cat && cat !== "전체" ? { cat } : {};
+        const skip = page * limit;
+        const [rows, count] = await Promise.all([
+          prisma.product.findMany({ where, skip, take: limit }),
+          prisma.product.count({ where }),
+        ]);
+        return {
+          items: rows.map(formatProduct),
+          hasMore: skip + rows.length < count,
+          total: count,
+        };
+      } catch (error) {
+        console.error("Failed to load category products:", error);
+        return { items: [], hasMore: false, total: 0 };
+      }
+    },
+    ["category-products", cat, String(page), String(limit)],
+    { revalidate: 300, tags: ["products", `category-${cat}`] }
+  )();
+});
 
 // ============================================================
 //  User-scoped data fetching (auth required → empty when guest)
@@ -279,6 +311,8 @@ export async function toggleLike(productId) {
           data: { likesCount: { decrement: 1 } },
         }),
       ]);
+      revalidateTag(`product-${productId}`);
+      revalidateTag("home");
       return { liked: false };
     } else {
       await prisma.$transaction([
@@ -290,6 +324,8 @@ export async function toggleLike(productId) {
           data: { likesCount: { increment: 1 } },
         }),
       ]);
+      revalidateTag(`product-${productId}`);
+      revalidateTag("home");
       return { liked: true };
     }
   } catch (error) {
@@ -498,6 +534,9 @@ export async function createSeller({ sellerId, name, desc, category, story, noti
 
       return { seller, product };
     });
+
+    revalidateTag("sellers");
+    revalidateTag("home");
 
     return {
       success: true,

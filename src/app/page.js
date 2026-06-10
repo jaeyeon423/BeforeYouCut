@@ -2,7 +2,6 @@ import HomeScreen from "@/components/screens/home";
 import { TabHeader } from "@/components/nav";
 import { getHomeData, getSellersMap } from "@/app/actions";
 
-export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [data, sellers] = await Promise.all([getHomeData(), getSellersMap()]);

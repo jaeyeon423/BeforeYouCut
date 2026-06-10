@@ -2,7 +2,6 @@ import { TabHeader } from "@/components/nav";
 import { CategoryScreen } from "@/components/screens/other";
 import { getCategoryProducts } from "@/app/actions";
 
-export const dynamic = "force-dynamic";
 
 export default async function CategoryPage({ searchParams }) {
   const sp = (await searchParams) || {};

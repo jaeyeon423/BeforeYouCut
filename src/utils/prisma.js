@@ -15,15 +15,14 @@ const connectionString =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL ||
   process.env.DIRECT_URL ||
-  process.env.POSTGRES_URL_NON_POOLING;
+  process.env.POSTGRES_URL_NON_POOLING ||
+  "postgresql://placeholder:placeholder@localhost:5432/placeholder?sslmode=disable";
 
 let realPrisma = null;
 
 const createPrismaClient = () => {
-  if (!connectionString) {
-    throw new Error(
-      "Database connection URL is not defined in environment variables. Please check your Vercel Project Settings."
-    );
+  if (!process.env.DATABASE_URL && !process.env.POSTGRES_PRISMA_URL && !process.env.POSTGRES_URL && !process.env.DIRECT_URL && !process.env.POSTGRES_URL_NON_POOLING) {
+    console.warn("WARNING: Database connection URL is not defined in environment variables. Prisma will fail queries gracefully via actions try-catch blocks.");
   }
   
   // Clean connection string (remove quotes)
