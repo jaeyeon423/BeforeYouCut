@@ -91,26 +91,22 @@ export const getHomeData = cache(() => {
   return unstable_cache(
     async () => {
       try {
-        const [rankingRows, newRows, handmadeRows, spotlightSellers] = await Promise.all([
-          prisma.product.findMany({ where: { id: { in: RANKING_IDS } } }),
+        const [rankingRows, newRows, spotlightSellers] = await Promise.all([
+          prisma.product.findMany({ orderBy: { likesCount: "desc" }, take: 5 }),
           prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
-          prisma.product.findMany({ where: { cat: { in: HANDMADE_CATS } }, take: 4 }),
           prisma.seller.findMany({ take: 2, orderBy: { since: "desc" } }),
         ]);
 
-        // Preserve the curated ranking order.
-        const byId = new Map(rankingRows.map((p) => [p.id, p]));
-        const ranking = RANKING_IDS.map((id) => byId.get(id)).filter(Boolean).map(formatProduct);
+        const ranking = rankingRows.map(formatProduct);
 
         return {
           ranking,
           newItems: newRows.map(formatProduct),
-          handmade: handmadeRows.map(formatProduct),
           spotlightSellers: spotlightSellers.map(formatSeller),
         };
       } catch (error) {
         console.error("Failed to load home data:", error);
-        return { ranking: [], newItems: [], handmade: [], spotlightSellers: [] };
+        return { ranking: [], newItems: [], spotlightSellers: [] };
       }
     },
     ["home-data"],
@@ -181,14 +177,27 @@ export const getSellerProfile = cache((sellerId) => {
  * Paginated products for a category. `cat === "전체"` returns everything.
  * Returns { items, hasMore } so the client can drive a "더보기" button.
  */
-export const getCategoryProducts = cache((cat = "전체", page = 0, limit = 20) => {
+export const getCategoryProducts = cache((cat = "전체", page = 0, limit = 20, filter = null) => {
   return unstable_cache(
     async () => {
       try {
         const where = cat && cat !== "전체" ? { cat } : {};
+        const orderBy = {};
+
+        if (filter === "new") {
+          where.badge = "new";
+        } else if (filter === "best") {
+          orderBy.likesCount = "desc";
+        }
+
         const skip = page * limit;
         const [rows, count] = await Promise.all([
-          prisma.product.findMany({ where, skip, take: limit }),
+          prisma.product.findMany({
+            where,
+            skip,
+            take: limit,
+            ...(Object.keys(orderBy).length > 0 ? { orderBy } : {})
+          }),
           prisma.product.count({ where }),
         ]);
         return {
@@ -201,8 +210,8 @@ export const getCategoryProducts = cache((cat = "전체", page = 0, limit = 20) 
         return { items: [], hasMore: false, total: 0 };
       }
     },
-    ["category-products", cat, String(page), String(limit)],
-    { revalidate: 300, tags: ["products", `category-${cat}`] }
+    ["category-products", cat, String(page), String(limit), filter || "all"],
+    { revalidate: 300, tags: ["products", `category-${cat}`, `filter-${filter || 'none'}`] }
   )();
 });
 

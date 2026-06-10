@@ -94,7 +94,7 @@ export function Foot() {
   );
 }
 
-export default function HomeScreen({ ranking = [], newItems = [], handmade = [], spotlightSellers = [], cardVariant = "meta" }) {
+export default function HomeScreen({ ranking = [], newItems = [], spotlightSellers = [], cardVariant = "meta" }) {
   const heroSeller = spotlightSellers[0] || null;
   const promoSeller = spotlightSellers[1] || heroSeller || null;
   const spotlightSeller = spotlightSellers[0] || null;
@@ -109,12 +109,12 @@ export default function HomeScreen({ ranking = [], newItems = [], handmade = [],
       </div>
 
       <div className="section">
-        <SectionHeader title="신상품" sub="방금 입점한 도구들" more="전체" href="/category" />
+        <SectionHeader title="신상품" sub="방금 입점한 도구들" more="전체" href="/category?filter=new" />
         <ProductRail items={newItems} variant={cardVariant} />
       </div>
 
       <div className="section">
-        <SectionHeader title="실시간 랭킹" sub="지금 미용인들이 담는 도구" more="더보기" href="/category" />
+        <SectionHeader title="실시간 랭킹" sub="지금 미용인들이 담는 도구" more="더보기" href="/category?filter=best" />
         <RankingList items={ranking} />
       </div>
 
@@ -124,11 +124,6 @@ export default function HomeScreen({ ranking = [], newItems = [], handmade = [],
           <BrandCard id={spotlightSeller.id} />
         </div>
       )}
-
-      <div className="section">
-        <SectionHeader title="핸드메이드 · 워크웨어" sub="한 점씩 만드는 셀러" more="전체" href="/category" />
-        <ProductGrid items={handmade} variant={cardVariant} />
-      </div>
 
       <HomePromo seller={promoSeller} />
       <Foot />

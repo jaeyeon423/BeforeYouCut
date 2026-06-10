@@ -31,24 +31,24 @@ import { Foot } from './home';
 // ============================================================
 // CATEGORY
 // ============================================================
-export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMore = false, total = 0 }) {
+export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMore = false, total = 0, filter = null }) {
   const [items, setItems] = useState(initialItems);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
 
-  // Reset when the category (server-fetched props) changes.
+  // Reset when the category or filter changes.
   useEffect(() => {
     setItems(initialItems);
     setPage(0);
     setHasMore(initialHasMore);
-  }, [cat, initialItems, initialHasMore]);
+  }, [cat, filter, initialItems, initialHasMore]);
 
   const loadMore = async () => {
     setLoading(true);
     try {
       const next = page + 1;
-      const res = await getCategoryProducts(cat, next, 20);
+      const res = await getCategoryProducts(cat, next, 20, filter);
       setItems((prev) => [...prev, ...res.items]);
       setPage(next);
       setHasMore(res.hasMore);
@@ -59,6 +59,13 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
     }
   };
 
+  let displayTitle = cat;
+  if (filter === "new") {
+    displayTitle = `${cat} · 신상품`;
+  } else if (filter === "best") {
+    displayTitle = `${cat} · 실시간 랭킹`;
+  }
+
   return (
     <div className="byc-scroll fadein">
       <div className="section" style={{ marginTop: 8 }}>
@@ -66,7 +73,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
           {CATEGORIES.map((c) => (
             <Link
               key={c.key}
-              href={`/category?cat=${encodeURIComponent(c.key)}`}
+              href={`/category?cat=${encodeURIComponent(c.key)}${filter ? `&filter=${filter}` : ""}`}
               className="catcell"
               style={{ textDecoration: "none", color: "inherit" }}
             >
@@ -80,7 +87,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
       </div>
       <div className="divider-strip" style={{ marginTop: 20 }} />
       <div className="section" style={{ marginTop: 16 }}>
-        <SectionHeader title={cat} sub={`${total}개 상품`} />
+        <SectionHeader title={displayTitle} sub={`${total}개 상품`} />
         <ProductGrid items={items} variant="meta" />
         {hasMore && (
           <div style={{ padding: "20px 18px" }}>
