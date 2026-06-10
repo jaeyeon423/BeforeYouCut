@@ -118,18 +118,20 @@ export function SearchScreen({ products = [] }) {
 
       {!q && (
         <>
-          <div className="search-section">
-            <h4>인기 검색어 <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>오후 3:00 기준</span></h4>
-            <div className="kwlist">
-              {POPULAR_KEYWORDS.map(([w, d], i) => (
-                <div key={w} className="kwrow" onClick={() => setQ(w)}>
-                  <span className="kw-rank">{i + 1}</span>
-                  <span className="kw-text">{w}</span>
-                  <span className="kw-delta" style={d === "NEW" ? { color: "var(--accent)", fontWeight: 700 } : null}>{d}</span>
-                </div>
-              ))}
+          {POPULAR_KEYWORDS && POPULAR_KEYWORDS.length > 0 && (
+            <div className="search-section">
+              <h4>인기 검색어 <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>오후 3:00 기준</span></h4>
+              <div className="kwlist">
+                {POPULAR_KEYWORDS.map(([w, d], i) => (
+                  <div key={w} className="kwrow" onClick={() => setQ(w)}>
+                    <span className="kw-rank">{i + 1}</span>
+                    <span className="kw-text">{w}</span>
+                    <span className="kw-delta" style={d === "NEW" ? { color: "var(--accent)", fontWeight: 700 } : null}>{d}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div className="search-section">
             <h4>브랜드 바로가기</h4>
             <div className="chiprow" style={{ padding: "0 0 4px" }}>
@@ -328,19 +330,9 @@ export function SellerScreen({ seller, products = [] }) {
       )}
       {tab === "리뷰" && (
         <div className="sp-story">
-          {[
-            ["김O현 디자이너", 5, "현장에서 매일 쓰는데 손목 부담이 확실히 줄었어요. 텐션 조정 서비스도 좋아요."],
-            ["원장 P", 4, "퀄리티 대비 합리적. 배송도 빨랐습니다."],
-            ["바버 J", 5, "셀러가 직접 응대해줘서 신뢰가 갑니다. 재구매 의사 있어요."],
-          ].map(([who, r, txt], i) => (
-            <div key={i} style={{ paddingBottom: 16, marginBottom: 16, borderBottom: "1px solid var(--line)" }}>
-              <div style={{ display: "flex", gap: 4, color: "var(--ink)", marginBottom: 6 }}>
-                {Array.from({ length: r }).map((_, k) => <Icon key={k} name="star" size={13} />)}
-              </div>
-              <p style={{ margin: "0 0 6px" }}>{txt}</p>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>{who}</div>
-            </div>
-          ))}
+          <div style={{ padding: "40px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+            등록된 리뷰가 없습니다.
+          </div>
         </div>
       )}
       <Foot />

@@ -188,8 +188,4 @@ export const byCat = (c) => c === "전체" ? PRODUCTS : PRODUCTS.filter((x) => x
 // home ranking
 export const RANKING = ["p6", "p1", "p9", "p4", "p13"].map(byId);
 
-export const POPULAR_KEYWORDS = [
-  ["수제 가위", "+2"], ["코드리스 클리퍼", "NEW"], ["카본 콤", "—"],
-  ["워크 에이프런", "+5"], ["가죽 시저 케이스", "+1"], ["비건 염모제", "+3"],
-  ["세니징 시저", "—"], ["살롱 유니폼", "-2"],
-];
+export const POPULAR_KEYWORDS = [];
