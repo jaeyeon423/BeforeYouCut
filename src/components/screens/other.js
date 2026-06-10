@@ -634,7 +634,6 @@ export function MyScreen({ orders = [] }) {
         {[
           ["주문", String(orders.length), () => setHistoryOpen(true)],
           ["저장", String(likes.size), () => router.push("/saved")],
-          ["쿠폰", "2", null],
           ["적립금", "0", null],
         ].map(([l, v, action], i) => (
           <div key={l} onClick={action || undefined}
