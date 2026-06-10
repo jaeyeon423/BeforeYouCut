@@ -7,6 +7,8 @@ import Icon from "@/components/icons";
 import { Wordmark } from "@/components/ui";
 import { useCart } from "@/contexts/cart-context";
 
+import { useApp } from "@/contexts/app-context";
+
 // ---------- top bar for tab pages (home + tab titles) ----------
 export function TabHeader({ title, bordered }) {
   const { cart } = useCart();
@@ -26,9 +28,24 @@ export function TabHeader({ title, bordered }) {
 }
 
 // ---------- back header for overlay pages (detail / seller / cart) ----------
-export function OverlayHeader({ title, showBag = true }) {
+export function OverlayHeader({ title, showBag = true, showShare = true }) {
   const router = useRouter();
   const { cart } = useCart();
+  const { showToast } = useApp();
+
+  const handleShare = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => {
+          showToast("링크가 클립보드에 복사되었습니다.");
+        })
+        .catch((err) => {
+          console.error("클립보드 복사 실패:", err);
+          showToast("링크 복사에 실패했습니다.");
+        });
+    }
+  };
+
   return (
     <div className="topbar bordered" style={{ paddingTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -42,7 +59,11 @@ export function OverlayHeader({ title, showBag = true }) {
         )}
       </div>
       <div className="topbar-actions">
-        <button className="icon-btn" aria-label="공유"><Icon name="share" size={21} /></button>
+        {showShare && (
+          <button className="icon-btn" onClick={handleShare} aria-label="공유">
+            <Icon name="share" size={21} />
+          </button>
+        )}
         {showBag && (
           <Link href="/cart" className="icon-btn" aria-label="장바구니">
             <Icon name="bag" size={22} />
