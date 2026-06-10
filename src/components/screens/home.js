@@ -13,27 +13,7 @@ import { won } from '../../data/data';
 
 import { CAT_ICON } from '../../data/data';
 
-export function HomePromo({ seller }) {
-  if (!seller) {
-    return (
-      <Link href="/my" className="banner-promo" style={{ display: "block", color: "#fff", textDecoration: "none" }}>
-        <div className="bp-kicker">BECOME A SELLER</div>
-        <div className="bp-title">당신의 도구에도<br/>스토리가 있습니다</div>
-        <div className="bp-sub">지금 입점 신청을 하고 첫 번째 상품을 등록해 보세요.</div>
-        <div className="bp-arrow"><Icon name="store" size={20} /></div>
-      </Link>
-    );
-  }
 
-  return (
-    <Link href={`/sellers/${seller.id}`} className="banner-promo" style={{ display: "block", color: "#fff", textDecoration: "none" }}>
-      <div className="bp-kicker">SELLER STORY</div>
-      <div className="bp-title">{seller.name}<br/>스토리 보기</div>
-      <div className="bp-sub">{seller.desc}</div>
-      <div className="bp-arrow"><Icon name="chevron" size={20} /></div>
-    </Link>
-  );
-}
 
 export function HomeHero({ seller, banner }) {
   if (!seller) {
@@ -104,7 +84,6 @@ export function Foot() {
 
 export default function HomeScreen({ ranking = [], newItems = [], spotlightSellers = [], mainBanner = null, cardVariant = "meta" }) {
   const heroSeller = spotlightSellers[0] || null;
-  const promoSeller = spotlightSellers[1] || heroSeller || null;
 
   return (
     <div className="byc-scroll fadein">
@@ -125,7 +104,6 @@ export default function HomeScreen({ ranking = [], newItems = [], spotlightSelle
         <RankingList items={ranking} />
       </div>
 
-      <HomePromo seller={promoSeller} />
       <Foot />
     </div>
   );
