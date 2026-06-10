@@ -10,8 +10,8 @@ import {
   BrandCard,
 } from '../ui';
 import { won } from '../../data/data';
-
 import { CAT_ICON } from '../../data/data';
+import BusinessFooter from '../BusinessFooter';
 
 
 
@@ -73,13 +73,7 @@ export function RankingList({ items }) {
 }
 
 export function Foot() {
-  return (
-    <div className="foot-note">
-      <b>BEFORE YOU CUT</b><br/>
-      미용인을 위한 브랜드 마켓플레이스 · 입점 셀러가 직접 판매합니다.<br/>
-      이 화면은 디자인 시안이며 실제 결제는 이루어지지 않습니다.
-    </div>
-  );
+  return <BusinessFooter />;
 }
 
 export default function HomeScreen({ ranking = [], newItems = [], spotlightSellers = [], mainBanner = null, cardVariant = "meta" }) {

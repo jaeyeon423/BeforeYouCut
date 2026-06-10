@@ -12,6 +12,7 @@ import {
   createOrder,
   createSeller,
   getCategoryProducts,
+  recordConsents,
 } from '@/app/actions';
 import {
   Placeholder,
@@ -20,6 +21,7 @@ import {
   ProductRail,
   Verified,
 } from '../ui';
+import IntermediaryNotice from '../IntermediaryNotice';
 import {
   CATEGORIES,
   CAT_ICON,
@@ -240,6 +242,25 @@ export function DetailScreen({ product: p, seller, related = [] }) {
             </dl>
           </div>
         )}
+
+        {/* 판매자 연락처 — 전자상거래법 제13조 판매자 정보 표시 */}
+        <div className="pd-block" style={{ paddingTop: 14 }}>
+          <h5 style={{ marginBottom: 10 }}>판매자 정보</h5>
+          <dl style={{ margin: 0, fontSize: 12.5 }}>
+            <div className="pd-spec"><dt>판매자</dt><dd>{s.businessName || s.name}</dd></div>
+            {s.sellerType === "BUSINESS" && s.businessRegNo && (
+              <div className="pd-spec"><dt>사업자번호</dt><dd>{s.businessRegNo}</dd></div>
+            )}
+            {s.representative && (
+              <div className="pd-spec"><dt>대표자</dt><dd>{s.representative}</dd></div>
+            )}
+          </dl>
+        </div>
+
+        {/* 통신판매중개자 고지 — 전자상거래법 제20조 */}
+        <div style={{ padding: "0 18px 18px" }}>
+          <IntermediaryNotice seller={s} />
+        </div>
 
         {related.length > 0 && (
           <div className="section" style={{ marginTop: 22 }}>
@@ -529,6 +550,9 @@ export function MyScreen({ orders = [] }) {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  // 회원가입 약관 동의 상태
+  const [consentTerms, setConsentTerms] = useState(false);
+  const [consentPrivacy, setConsentPrivacy] = useState(false);
 
   const [brandName, setBrandName] = useState("");
   const [brandCategory, setBrandCategory] = useState("도구");
@@ -576,6 +600,11 @@ export function MyScreen({ orders = [] }) {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
 
+    if (authOpen === "signup" && (!consentTerms || !consentPrivacy)) {
+      alert("이용약관 및 개인정보처리방침에 모두 동의해 주세요.");
+      return;
+    }
+
     setAuthLoading(true);
     if (authOpen === "signup") {
       const { error } = await supabase.auth.signUp({
@@ -585,7 +614,16 @@ export function MyScreen({ orders = [] }) {
       });
       setAuthLoading(false);
       if (error) { alert("회원가입 에러: " + error.message); }
-      else { showToast("회원가입이 완료되었습니다. 로그인해 주세요."); setAuthOpen("signin"); }
+      else {
+        // 동의 이력 서버 저장 (비동기 — 실패해도 가입 흐름 중단 안 함)
+        recordConsents({
+          consentedTypes: ["USER_TERMS", "PRIVACY_POLICY"],
+        }).catch((e) => console.error("consent record failed:", e));
+        showToast("회원가입이 완료되었습니다. 로그인해 주세요.");
+        setConsentTerms(false);
+        setConsentPrivacy(false);
+        setAuthOpen("signin");
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       setAuthLoading(false);
@@ -769,6 +807,28 @@ export function MyScreen({ orders = [] }) {
               <label style={sheetLabel}>비밀번호 (6자 이상)</label>
               <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required placeholder="••••••••" disabled={authLoading} minLength={6} />
             </div>
+            {/* 회원가입 약관 동의 — 개인정보보호법 제22조 */}
+            {authOpen === "signup" && (
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <ConsentCheckbox
+                  checked={consentTerms && consentPrivacy}
+                  onChange={(v) => { setConsentTerms(v); setConsentPrivacy(v); }}
+                  label="전체 동의"
+                  bold
+                />
+                <ConsentCheckbox
+                  checked={consentTerms}
+                  onChange={setConsentTerms}
+                  label={<span>[필수] <a href="/terms" target="_blank" style={linkBtn}>이용약관</a> 동의</span>}
+                />
+                <ConsentCheckbox
+                  checked={consentPrivacy}
+                  onChange={setConsentPrivacy}
+                  label={<span>[필수] <a href="/terms/privacy" target="_blank" style={linkBtn}>개인정보처리방침</a> 동의</span>}
+                />
+              </div>
+            )}
+
             <div style={{ marginTop: 8 }}>
               <button className="buy" type="submit" style={{ width: "100%" }} disabled={authLoading}>
                 {authLoading ? "처리 중..." : authOpen === "signin" ? "로그인하기" : "가입하기"}
@@ -776,7 +836,7 @@ export function MyScreen({ orders = [] }) {
             </div>
             <div style={{ textAlign: "center", marginTop: 10, fontSize: 12.5, color: "var(--ink-soft)" }}>
               {authOpen === "signin" ? (
-                <span>계정이 없으신가요? <button type="button" style={linkBtn} onClick={() => setAuthOpen("signup")}>회원가입</button></span>
+                <span>계정이 없으신가요? <button type="button" style={linkBtn} onClick={() => { setAuthOpen("signup"); setConsentTerms(false); setConsentPrivacy(false); }}>회원가입</button></span>
               ) : (
                 <span>이미 계정이 있으신가요? <button type="button" style={linkBtn} onClick={() => setAuthOpen("signin")}>로그인</button></span>
               )}
@@ -816,6 +876,22 @@ function ModalSheet({ title, onClose, maxHeight, children }) {
         {children}
       </div>
     </div>
+  );
+}
+
+function ConsentCheckbox({ checked, onChange, label, bold }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ width: 16, height: 16, accentColor: "var(--ink)", flexShrink: 0 }}
+      />
+      <span style={{ fontSize: bold ? 12.5 : 12, fontWeight: bold ? 700 : 400, color: "var(--ink-soft)" }}>
+        {label}
+      </span>
+    </label>
   );
 }
 

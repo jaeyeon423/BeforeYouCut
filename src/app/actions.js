@@ -620,3 +620,219 @@ export async function syncUser({ name } = {}) {
     return { success: false, error: error.message };
   }
 }
+
+// ============================================================
+//  약관 동의 이력 기록 (개인정보보호법 동의 증적 보존)
+// ============================================================
+
+/**
+ * 회원가입 또는 약관 버전 업데이트 시 동의 이력을 DB에 저장.
+ * consentedTypes: 동의한 약관 type 배열
+ *   예) ["USER_TERMS", "PRIVACY_POLICY"]
+ * ipAddress, userAgent: headers() 에서 추출하여 전달
+ */
+export async function recordConsents({ consentedTypes, ipAddress, userAgent }) {
+  try {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+
+    if (!Array.isArray(consentedTypes) || consentedTypes.length === 0) {
+      throw new Error("동의 항목이 없습니다.");
+    }
+
+    // 동의한 각 약관의 최신 버전을 찾아 ConsentRecord 생성
+    const results = await Promise.all(
+      consentedTypes.map(async (type) => {
+        const latestVersion = await prisma.termsVersion.findFirst({
+          where: { type },
+          orderBy: { effectiveAt: "desc" },
+        });
+        if (!latestVersion) {
+          // 해당 약관 버전이 DB에 없으면 기록하지 않음 (seed 전 환경)
+          return null;
+        }
+        return prisma.consentRecord.upsert({
+          where: {
+            // 동일 유저·버전 중복 방지 — unique constraint 없어서 직접 체크
+            // (동일 버전에 재동의 시 업데이트 대신 skip)
+            id: `${authUser.id}_${latestVersion.id}`,
+          },
+          update: { agreedAt: new Date() },
+          create: {
+            id: `${authUser.id}_${latestVersion.id}`,
+            userId: authUser.id,
+            termsVersionId: latestVersion.id,
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
+          },
+        });
+      })
+    );
+
+    return { success: true, recorded: results.filter(Boolean).length };
+  } catch (error) {
+    console.error("Failed to record consents:", error);
+    throw new Error(error.message || "동의 이력 저장에 실패했습니다.");
+  }
+}
+
+// ============================================================
+//  정산 (Settlement)
+// ============================================================
+
+/**
+ * 주문항목에 대한 정산 레코드 생성.
+ * 주문 생성 시 또는 구매확정 시 호출.
+ * commissionRate는 site.config 기준 — 변경 시 site.config 수정.
+ */
+export async function createSettlementForOrder(orderId) {
+  try {
+    const siteConfig = (await import("../site.config")).default;
+    const commissionRate = siteConfig.commission.rate;
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { product: { include: { seller: true } } },
+        },
+      },
+    });
+    if (!order) throw new Error("주문을 찾을 수 없습니다.");
+
+    const settlements = await Promise.all(
+      order.items.map((item) => {
+        const saleAmount = item.price * item.quantity;
+        const commissionAmount = Math.floor(saleAmount * commissionRate);
+        const netAmount = saleAmount - commissionAmount;
+        return prisma.settlement.upsert({
+          where: { orderItemId: item.id },
+          update: {},
+          create: {
+            sellerId: item.product.sellerId,
+            orderItemId: item.id,
+            saleAmount,
+            commissionRate,
+            commissionAmount,
+            netAmount,
+            status: "PENDING",
+          },
+        });
+      })
+    );
+
+    return { success: true, settlements };
+  } catch (error) {
+    console.error("Failed to create settlement:", error);
+    throw new Error(error.message || "정산 레코드 생성에 실패했습니다.");
+  }
+}
+
+/**
+ * 판매자 자신의 정산 내역 조회
+ */
+export async function getMySettlements() {
+  try {
+    const userId = await getAuthUserId();
+    if (!userId) throw new Error("로그인이 필요합니다.");
+
+    const seller = await prisma.seller.findUnique({ where: { userId } });
+    if (!seller) throw new Error("판매자 계정이 없습니다.");
+
+    const settlements = await prisma.settlement.findMany({
+      where: { sellerId: seller.id },
+      include: {
+        orderItem: {
+          include: { product: { select: { name: true } }, order: { select: { date: true } } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return settlements;
+  } catch (error) {
+    console.error("Failed to get settlements:", error);
+    throw new Error(error.message || "정산 내역 조회에 실패했습니다.");
+  }
+}
+
+// ============================================================
+//  주문 상태 관리 / 배송 추적
+// ============================================================
+
+/**
+ * 판매자가 송장 등록 + 상태를 "배송중"으로 변경
+ */
+export async function updateShipment({ orderId, carrier, trackingNo }) {
+  try {
+    const userId = await getAuthUserId();
+    if (!userId) throw new Error("로그인이 필요합니다.");
+
+    // 해당 주문의 상품이 로그인 판매자 소유인지 검증
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: { select: { sellerId: true } } } } },
+    });
+    if (!order) throw new Error("주문을 찾을 수 없습니다.");
+
+    const seller = await prisma.seller.findUnique({ where: { userId } });
+    const isOwner = seller && order.items.some((i) => i.product.sellerId === seller.id);
+    if (!isOwner) throw new Error("권한이 없습니다.");
+
+    await prisma.$transaction([
+      prisma.shipmentTracking.upsert({
+        where: { orderId },
+        update: { carrier, trackingNo, status: "SHIPPED", shippedAt: new Date() },
+        create: { orderId, carrier, trackingNo, status: "SHIPPED", shippedAt: new Date() },
+      }),
+      prisma.order.update({
+        where: { id: orderId },
+        data: { status: "배송중" },
+      }),
+    ]);
+
+    revalidateTag(`order-${orderId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update shipment:", error);
+    throw new Error(error.message || "배송 정보 등록에 실패했습니다.");
+  }
+}
+
+// ============================================================
+//  청약철회·환불 요청
+// ============================================================
+
+export async function requestRefund({ orderId, reason, reasonDetail }) {
+  try {
+    const userId = await getAuthUserId();
+    if (!userId) throw new Error("로그인이 필요합니다.");
+
+    if (!orderId || typeof orderId !== "string") throw new Error("올바르지 않은 주문 ID입니다.");
+
+    const validReasons = ["CHANGE_OF_MIND", "DEFECTIVE", "WRONG_ITEM", "ETC"];
+    if (!validReasons.includes(reason)) throw new Error("올바르지 않은 반품 사유입니다.");
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.userId !== userId) throw new Error("주문을 찾을 수 없습니다.");
+
+    const existingRefund = await prisma.refundRequest.findUnique({ where: { orderId } });
+    if (existingRefund) throw new Error("이미 반품·환불 신청이 접수되어 있습니다.");
+
+    const refund = await prisma.$transaction([
+      prisma.refundRequest.create({
+        data: { orderId, userId, reason, reasonDetail: reasonDetail || null },
+      }),
+      prisma.order.update({
+        where: { id: orderId },
+        data: { status: "반품 신청" },
+      }),
+    ]);
+
+    revalidateTag(`order-${orderId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to request refund:", error);
+    throw new Error(error.message || "반품·환불 신청에 실패했습니다.");
+  }
+}

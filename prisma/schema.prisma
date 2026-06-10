@@ -6,37 +6,58 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// 기존 모델
+// ──────────────────────────────────────────────────────────────────────────
+
 model User {
-  id        String   @id // Corresponds to Supabase auth.users.id UUID
-  email     String   @unique
+  id        String    @id // Supabase auth.users.id (UUID)
+  email     String    @unique
   name      String?
-  role      String   @default("BUYER") // BUYER | SELLER | ADMIN
-  createdAt DateTime @default(now())
+  role      String    @default("BUYER") // BUYER | SELLER | ADMIN
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // soft delete — 개인정보보호법 파기 처리 시 사용
 
   seller    Seller?
   orders    Order[]
   likes     Like[]
   follows   Follow[]
+  consents  ConsentRecord[]
+  inquiries CsInquiry[]
 }
 
 model Seller {
-  id             String   @id // Custom string ID e.g., "steelgrain", "bladebros"
-  name           String
-  verified       Boolean  @default(false)
-  desc           String
-  category       String
-  followers      String   @default("0") // Display number (or sync dynamically)
-  productsCount  Int      @default(0)
-  since          String
-  tone           String   @default("tone-a")
-  story          String[] // Story paragraphs
-  notice         String?
+  id            String    @id // 커스텀 slug ID (예: "steelgrain")
+  name          String
+  verified      Boolean   @default(false)
+  desc          String
+  category      String
+  followers     String    @default("0")
+  productsCount Int       @default(0)
+  since         String
+  tone          String    @default("tone-a")
+  story         String[]
+  notice        String?
+  isActive      Boolean   @default(true)
+  deletedAt     DateTime?
 
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 판매자 유형 — TODO(운영자 확정): site.config seller.allowedType 기준 확정 필요
+  // "BUSINESS" = 사업자 / "INDIVIDUAL" = 개인(비사업자)
+  sellerType      String  @default("INDIVIDUAL")
+  businessRegNo   String? // 사업자등록번호 (앱 레이어에서 AES-256 암호화 저장)
+  businessName    String? // 사업자 상호 (사업자인 경우)
+  representative  String? // 대표자명 (사업자인 경우)
 
-  products       Product[]
-  follows        Follow[]
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  products        Product[]
+  follows         Follow[]
+  bankAccount     SellerBankAccount?
+  settlements     Settlement[]
+  inquiries       CsInquiry[]
+
+  @@index([sellerType])
 }
 
 model Product {
@@ -47,13 +68,13 @@ model Product {
   icon        String   @default("scissors")
   tone        String   @default("tone-a")
   badge       String?  // new | best | ltd | null
-  disc        Int?     // discount %
-  orig        Int?     // original price before discount
+  disc        Int?
+  orig        Int?
   rating      Float    @default(4.8)
   reviews     Int      @default(0)
   likesCount  Int      @default(0)
-  desc        String   // product short description
-  spec        Json     @default("[]") // serialized JSON spec array of key-value tuples
+  desc        String
+  spec        Json     @default("[]")
 
   sellerId    String
   seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
@@ -67,31 +88,43 @@ model Product {
 }
 
 model Order {
-  id        String   @id @default(uuid())
-  total     Int
-  status    String   @default("배송 준비중")
-  date      DateTime @default(now())
-  address   String
-  name      String   // Recipient Name
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  total       Int
+  // status 값: 결제완료 | 배송 준비중 | 배송중 | 배송완료 | 구매확정 | 취소 | 반품 | 환불완료
+  status      String    @default("결제완료")
+  date        DateTime  @default(now())
+  address     String
+  name        String    // 수령인 성명
+  phone       String?   // 수령인 연락처 (TODO: 암호화 고려)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  items     OrderItem[]
+  cancelledAt DateTime?
+  archivedAt  DateTime? // 법정 보존 기간 후 아카이브 처리 시각
+
+  items         OrderItem[]
+  refundRequest RefundRequest?
+  shipment      ShipmentTracking?
 
   @@index([userId])
   @@index([date])
+  @@index([status])
 }
 
 model OrderItem {
   id        String   @id @default(uuid())
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  
+
   price     Int
   quantity  Int      @default(1)
+
+  settlement Settlement?
+
+  @@index([orderId])
 }
 
 model Like {
@@ -117,12 +150,196 @@ model Follow {
 }
 
 model MainBanner {
-  id       String  @id @default("hero")
-  kicker   String
-  title    String
-  desc     String
-  ctaText  String
-  ctaLink  String
-  icon     String  @default("store")
-  tone     String  @default("tone-a")
+  id      String @id @default("hero")
+  kicker  String
+  title   String
+  desc    String
+  ctaText String
+  ctaLink String
+  icon    String @default("store")
+  tone    String @default("tone-a")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 약관 동의 이력 (개인정보보호법 — 동의 증적 보존)
+// ──────────────────────────────────────────────────────────────────────────
+
+model TermsVersion {
+  id          String   @id @default(uuid())
+  // USER_TERMS | SELLER_TERMS | PRIVACY_POLICY | REFUND_POLICY
+  type        String
+  version     String
+  content     String   @db.Text
+  effectiveAt DateTime
+  createdAt   DateTime @default(now())
+
+  consents    ConsentRecord[]
+
+  @@unique([type, version])
+  @@index([type])
+}
+
+model ConsentRecord {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  termsVersionId String
+  termsVersion   TermsVersion @relation(fields: [termsVersionId], references: [id])
+  agreedAt       DateTime     @default(now())
+  ipAddress      String?
+  userAgent      String?      @db.Text
+
+  @@index([userId])
+  @@index([termsVersionId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 판매자 계좌 (정산 대상 — 민감 정보 암호화 저장)
+// ──────────────────────────────────────────────────────────────────────────
+
+model SellerBankAccount {
+  id              String   @id @default(uuid())
+  sellerId        String   @unique
+  seller          Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  bankName        String   // 은행명 (예: 국민은행)
+  // accountNumber는 앱 레이어에서 AES-256-CBC 암호화 후 저장
+  accountNumber   String
+  accountHolder   String   // 예금주
+  isVerified      Boolean  @default(false) // 1원 인증 또는 수동 확인 여부
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 정산 (PG 정산대행 구조 — 수수료 차감 후 판매자에게 지급)
+// ──────────────────────────────────────────────────────────────────────────
+
+model Settlement {
+  id               String    @id @default(uuid())
+  sellerId         String
+  seller           Seller    @relation(fields: [sellerId], references: [id])
+
+  orderItemId      String    @unique
+  orderItem        OrderItem @relation(fields: [orderItemId], references: [id])
+
+  saleAmount       Int       // 판매금액
+  commissionRate   Float     // 수수료율 (예: 0.05)
+  commissionAmount Int       // 수수료액
+  netAmount        Int       // 정산액 = saleAmount - commissionAmount
+
+  // PENDING: 구매확정 대기 | CONFIRMED: 구매확정 | PAID: 정산 완료
+  status           String    @default("PENDING")
+  settledAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([sellerId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 반품·환불 요청 (청약철회 7일 이내 — 전자상거래법 제17조)
+// ──────────────────────────────────────────────────────────────────────────
+
+model RefundRequest {
+  id           String    @id @default(uuid())
+  orderId      String    @unique
+  order        Order     @relation(fields: [orderId], references: [id])
+
+  userId       String
+  // CHANGE_OF_MIND | DEFECTIVE | WRONG_ITEM | ETC
+  reason       String
+  reasonDetail String?   @db.Text
+
+  // REQUESTED | APPROVED | REJECTED | COMPLETED
+  status       String    @default("REQUESTED")
+  refundAmount Int?
+
+  requestedAt  DateTime  @default(now())
+  resolvedAt   DateTime?
+  resolvedBy   String?   // 처리자 userId (관리자 또는 판매자)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 배송·송장 추적
+// ──────────────────────────────────────────────────────────────────────────
+
+model ShipmentTracking {
+  id          String    @id @default(uuid())
+  orderId     String    @unique
+  order       Order     @relation(fields: [orderId], references: [id])
+
+  carrier     String?   // 택배사 (예: CJ대한통운, 한진택배)
+  trackingNo  String?   // 운송장 번호
+  // PREPARING | SHIPPED | IN_TRANSIT | DELIVERED | RETURNED
+  status      String    @default("PREPARING")
+
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 고객 문의 / CS
+// ──────────────────────────────────────────────────────────────────────────
+
+model CsInquiry {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sellerId  String?
+  seller    Seller?   @relation(fields: [sellerId], references: [id])
+  productId String?
+  orderId   String?
+
+  // INQUIRY | REFUND_REQUEST | REPORT | ETC
+  type      String
+  title     String
+  content   String    @db.Text
+  // OPEN | IN_PROGRESS | CLOSED
+  status    String    @default("OPEN")
+
+  createdAt DateTime  @default(now())
+  closedAt  DateTime?
+  replies   CsReply[]
+
+  @@index([userId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+model CsReply {
+  id          String    @id @default(uuid())
+  inquiryId   String
+  inquiry     CsInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  responderId String    // 답변자 userId
+  content     String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@index([inquiryId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 접근·변경 감사 로그 (개인정보보호법 제29조 — 접속 기록 보관)
+// ──────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  // 예: VIEW_PERSONAL_INFO | UPDATE_BANK_ACCOUNT | EXPORT_DATA | ADMIN_LOGIN
+  action      String
+  targetTable String?
+  targetId    String?
+  ipAddress   String?
+  userAgent   String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
