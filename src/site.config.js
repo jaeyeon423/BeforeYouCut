@@ -1,5 +1,5 @@
 /**
- * site.config.ts — 공개 표시 정보 및 운영 설정 중앙 관리
+ * site.config.js — 공개 표시 정보 및 운영 설정 중앙 관리
  *
  * 규칙:
  *  - 운영자가 채워야 할 값: TODO(운영자 입력) 주석 표시
@@ -51,8 +51,8 @@ const siteConfig = {
     //   "BUSINESS"   — 사업자 등록 판매자만 입점
     //   "INDIVIDUAL" — 비사업자 개인만 입점
     //   "BOTH"       — 사업자·개인 모두 허용 (분기 처리 필요)
-    allowedType:        "BOTH" as "BUSINESS" | "INDIVIDUAL" | "BOTH",
-    requireBusinessReg: false,  // TODO(운영자 확정): 사업자등록 필수 여부 (BUSINESS 또는 BOTH 선택 시)
+    allowedType:        "BOTH",
+    requireBusinessReg: false,  // TODO(운영자 확정): 사업자등록 필수 여부
   },
 
   // ── 약관 버전 관리 ────────────────────────────────────────────────
@@ -72,7 +72,6 @@ const siteConfig = {
     deliveryRecordYears: 3, // 재화 공급에 관한 기록: 3년
     complaintRecordYears:3, // 소비자 불만 처리 기록: 3년
   },
-} as const;
+};
 
-export type SiteConfig = typeof siteConfig;
 export default siteConfig;
