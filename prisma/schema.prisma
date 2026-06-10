@@ -106,3 +106,14 @@ model Follow {
 
   @@id([userId, sellerId])
 }
+
+model MainBanner {
+  id       String  @id @default("hero")
+  kicker   String
+  title    String
+  desc     String
+  ctaText  String
+  ctaLink  String
+  icon     String  @default("store")
+  tone     String  @default("tone-a")
+}

@@ -281,6 +281,31 @@ async function main() {
   }
 
   console.log("Products seeded.");
+
+  // Seed Main Banner
+  await prisma.mainBanner.upsert({
+    where: { id: "hero" },
+    update: {
+      kicker: "BEFORE YOU CUT",
+      title: "내 미용 브랜드를\n입점시켜보세요",
+      desc: "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.",
+      ctaText: "입점 신청하기",
+      ctaLink: "/my",
+      icon: "store",
+      tone: "tone-a",
+    },
+    create: {
+      id: "hero",
+      kicker: "BEFORE YOU CUT",
+      title: "내 미용 브랜드를\n입점시켜보세요",
+      desc: "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.",
+      ctaText: "입점 신청하기",
+      ctaLink: "/my",
+      icon: "store",
+      tone: "tone-a",
+    }
+  });
+  console.log("Main Banner seeded.");
   console.log("Seeding finished successfully!");
 }
 

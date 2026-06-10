@@ -12,7 +12,7 @@ export default async function HomePage() {
   return (
     <>
       <TabHeader />
-      <HomeScreen ranking={ranking} newItems={data.newItems} handmade={data.handmade} spotlightSellers={data.spotlightSellers} />
+      <HomeScreen ranking={ranking} newItems={data.newItems} handmade={data.handmade} spotlightSellers={data.spotlightSellers} mainBanner={data.mainBanner} />
     </>
   );
 }

@@ -91,10 +91,11 @@ export const getHomeData = cache(() => {
   return unstable_cache(
     async () => {
       try {
-        const [rankingRows, newRows, spotlightSellers] = await Promise.all([
+        const [rankingRows, newRows, spotlightSellers, mainBanner] = await Promise.all([
           prisma.product.findMany({ orderBy: { likesCount: "desc" }, take: 5 }),
           prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
           prisma.seller.findMany({ take: 2, orderBy: { since: "desc" } }),
+          prisma.mainBanner.findUnique({ where: { id: "hero" } }),
         ]);
 
         const ranking = rankingRows.map(formatProduct);
@@ -103,10 +104,19 @@ export const getHomeData = cache(() => {
           ranking,
           newItems: newRows.map(formatProduct),
           spotlightSellers: spotlightSellers.map(formatSeller),
+          mainBanner: mainBanner ? {
+            kicker: mainBanner.kicker,
+            title: mainBanner.title,
+            desc: mainBanner.desc,
+            ctaText: mainBanner.ctaText,
+            ctaLink: mainBanner.ctaLink,
+            icon: mainBanner.icon,
+            tone: mainBanner.tone,
+          } : null,
         };
       } catch (error) {
         console.error("Failed to load home data:", error);
-        return { ranking: [], newItems: [], spotlightSellers: [] };
+        return { ranking: [], newItems: [], spotlightSellers: [], mainBanner: null };
       }
     },
     ["home-data"],

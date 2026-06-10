@@ -35,16 +35,24 @@ export function HomePromo({ seller }) {
   );
 }
 
-export function HomeHero({ seller }) {
+export function HomeHero({ seller, banner }) {
   if (!seller) {
+    const kicker = banner?.kicker || "BEFORE YOU CUT";
+    const title = banner?.title || "내 미용 브랜드를\n입점시켜보세요";
+    const desc = banner?.desc || "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.";
+    const ctaText = banner?.ctaText || "입점 신청하기";
+    const ctaLink = banner?.ctaLink || "/my";
+    const icon = banner?.icon || "store";
+    const tone = banner?.tone || "tone-a";
+
     return (
       <div className="hero" style={{ background: "var(--ink)", color: "#fff" }}>
-        <Placeholder icon="store" tone="tone-a" size={88} />
+        <Placeholder icon={icon} tone={tone} size={88} />
         <div className="hero-overlay">
-          <div className="hero-kicker">BEFORE YOU CUT</div>
-          <h2 className="hero-title">내 미용 브랜드를<br/>입점시켜보세요</h2>
-          <div className="hero-sub">가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.</div>
-          <Link href="/my" className="hero-cta" style={{ background: "#fff", color: "var(--ink)" }}>입점 신청하기</Link>
+          <div className="hero-kicker">{kicker}</div>
+          <h2 className="hero-title" style={{ whiteSpace: "pre-line" }}>{title}</h2>
+          <div className="hero-sub">{desc}</div>
+          <Link href={ctaLink} className="hero-cta" style={{ background: "#fff", color: "var(--ink)" }}>{ctaText}</Link>
         </div>
       </div>
     );
@@ -94,14 +102,13 @@ export function Foot() {
   );
 }
 
-export default function HomeScreen({ ranking = [], newItems = [], spotlightSellers = [], cardVariant = "meta" }) {
+export default function HomeScreen({ ranking = [], newItems = [], spotlightSellers = [], mainBanner = null, cardVariant = "meta" }) {
   const heroSeller = spotlightSellers[0] || null;
   const promoSeller = spotlightSellers[1] || heroSeller || null;
-  const spotlightSeller = spotlightSellers[0] || null;
 
   return (
     <div className="byc-scroll fadein">
-      <HomeHero seller={heroSeller} />
+      <HomeHero seller={heroSeller} banner={mainBanner} />
 
       <div className="section" style={{ marginTop: 18 }}>
         <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" href="/sellers" />
@@ -117,13 +124,6 @@ export default function HomeScreen({ ranking = [], newItems = [], spotlightSelle
         <SectionHeader title="실시간 랭킹" sub="지금 미용인들이 담는 도구" more="더보기" href="/category?filter=best" />
         <RankingList items={ranking} />
       </div>
-
-      {spotlightSeller && (
-        <div className="section">
-          <SectionHeader title="이번 주 브랜드" more="전체" href={`/sellers/${spotlightSeller.id}`} />
-          <BrandCard id={spotlightSeller.id} />
-        </div>
-      )}
 
       <HomePromo seller={promoSeller} />
       <Foot />
