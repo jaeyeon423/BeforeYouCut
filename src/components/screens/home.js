@@ -73,7 +73,7 @@ export default function HomeScreen({ ranking = [], newItems = [], handmade = [],
       <HomeHero />
 
       <div className="section" style={{ marginTop: 18 }}>
-        <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" href="/category" />
+        <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" href="/sellers" />
         <BrandRail />
       </div>
 
