@@ -6,9 +6,6 @@ import { PrismaClient } from '@prisma/client';
 // to Supabase/PostgreSQL via local development environments where TLS certificates might be
 // self-signed or missing. This setting is strictly restricted to development/testing
 // and will never execute in production where proper TLS is enforced by default.
-if (process.env.NODE_ENV !== 'production') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
 
 const connectionString =
   process.env.DATABASE_URL ||

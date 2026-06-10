@@ -3,7 +3,6 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -49,7 +48,7 @@ async function test() {
   // Test 2: exactly as src/utils/prisma.js is currently written
   try {
     const pool = new Pool({
-      connectionString: cleanUrl,
+      connectionString: strippedUrl,
       ssl: {
         rejectUnauthorized: false,
       },
