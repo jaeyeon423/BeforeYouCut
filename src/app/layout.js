@@ -2,6 +2,7 @@ import "./globals.css";
 import Providers from "@/components/providers";
 import AppShell from "@/components/app-shell";
 import { getSellersMap } from "@/app/actions";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: "BEFORE YOU CUT — 미용인 브랜딩 마켓",
@@ -24,6 +25,7 @@ export default async function RootLayout({ children }) {
         <Providers initialSellers={sellers}>
           <AppShell>{children}</AppShell>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );

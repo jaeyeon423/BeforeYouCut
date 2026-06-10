@@ -60,6 +60,10 @@ model Product {
 
   likes       Like[]
   orderItems  OrderItem[]
+
+  @@index([sellerId])
+  @@index([cat])
+  @@index([badge])
 }
 
 model Order {
@@ -73,6 +77,9 @@ model Order {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   items     OrderItem[]
+
+  @@index([userId])
+  @@index([date])
 }
 
 model OrderItem {
@@ -95,6 +102,7 @@ model Like {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([userId, productId])
+  @@index([productId])
 }
 
 model Follow {
@@ -105,6 +113,7 @@ model Follow {
   seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
 
   @@id([userId, sellerId])
+  @@index([sellerId])
 }
 
 model MainBanner {
