@@ -11,26 +11,53 @@ import {
 } from '../ui';
 import { won } from '../../data/data';
 
-export function HomePromo() {
+import { CAT_ICON } from '../../data/data';
+
+export function HomePromo({ seller }) {
+  if (!seller) {
+    return (
+      <Link href="/my" className="banner-promo" style={{ display: "block", color: "#fff", textDecoration: "none" }}>
+        <div className="bp-kicker">BECOME A SELLER</div>
+        <div className="bp-title">당신의 도구에도<br/>스토리가 있습니다</div>
+        <div className="bp-sub">지금 입점 신청을 하고 첫 번째 상품을 등록해 보세요.</div>
+        <div className="bp-arrow"><Icon name="store" size={20} /></div>
+      </Link>
+    );
+  }
+
   return (
-    <Link href="/sellers/steelgrain" className="banner-promo" style={{ display: "block", color: "#fff", textDecoration: "none" }}>
+    <Link href={`/sellers/${seller.id}`} className="banner-promo" style={{ display: "block", color: "#fff", textDecoration: "none" }}>
       <div className="bp-kicker">SELLER STORY</div>
-      <div className="bp-title">당신의 도구에도<br/>브랜드가 있습니다</div>
-      <div className="bp-sub">미용인이 만든 도구를, 미용인에게. 입점 셀러 직접 판매.</div>
+      <div className="bp-title">{seller.name}<br/>스토리 보기</div>
+      <div className="bp-sub">{seller.desc}</div>
       <div className="bp-arrow"><Icon name="chevron" size={20} /></div>
     </Link>
   );
 }
 
-export function HomeHero() {
+export function HomeHero({ seller }) {
+  if (!seller) {
+    return (
+      <div className="hero" style={{ background: "var(--ink)", color: "#fff" }}>
+        <Placeholder icon="store" tone="tone-a" size={88} />
+        <div className="hero-overlay">
+          <div className="hero-kicker">BEFORE YOU CUT</div>
+          <h2 className="hero-title">내 미용 브랜드를<br/>입점시켜보세요</h2>
+          <div className="hero-sub">가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.</div>
+          <Link href="/my" className="hero-cta" style={{ background: "#fff", color: "var(--ink)" }}>입점 신청하기</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="hero">
-      <Placeholder icon="scissors" tone="tone-b" size={88} />
+      <Placeholder icon={CAT_ICON[seller.category] || "scissors"} tone={seller.tone || "tone-b"} size={88} />
       <div className="hero-overlay">
-        <div className="hero-kicker">This week · 입점 브랜드</div>
-        <h2 className="hero-title">한 자루씩 단조하는<br/>STEEL &amp; GRAIN</h2>
-        <div className="hero-sub">세키 공방 장인의 수제 커팅 시저. 손의 균형을 다시 설계하다.</div>
-        <Link href="/sellers/steelgrain" className="hero-cta">브랜드 보기</Link>
+        <div className="hero-kicker">This week · 추천 브랜드</div>
+        <h2 className="hero-title">{seller.name}</h2>
+        <div className="hero-sub">{seller.desc} · since {seller.since}</div>
+        <Link href={`/sellers/${seller.id}`} className="hero-cta">브랜드 보기</Link>
       </div>
     </div>
   );
@@ -67,10 +94,14 @@ export function Foot() {
   );
 }
 
-export default function HomeScreen({ ranking = [], newItems = [], handmade = [], cardVariant = "meta" }) {
+export default function HomeScreen({ ranking = [], newItems = [], handmade = [], spotlightSellers = [], cardVariant = "meta" }) {
+  const heroSeller = spotlightSellers[0] || null;
+  const promoSeller = spotlightSellers[1] || heroSeller || null;
+  const spotlightSeller = spotlightSellers[0] || null;
+
   return (
     <div className="byc-scroll fadein">
-      <HomeHero />
+      <HomeHero seller={heroSeller} />
 
       <div className="section" style={{ marginTop: 18 }}>
         <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" href="/sellers" />
@@ -87,17 +118,19 @@ export default function HomeScreen({ ranking = [], newItems = [], handmade = [],
         <RankingList items={ranking} />
       </div>
 
-      <div className="section">
-        <SectionHeader title="이번 주 브랜드" more="전체" href="/sellers/bladebros" />
-        <BrandCard id="bladebros" />
-      </div>
+      {spotlightSeller && (
+        <div className="section">
+          <SectionHeader title="이번 주 브랜드" more="전체" href={`/sellers/${spotlightSeller.id}`} />
+          <BrandCard id={spotlightSeller.id} />
+        </div>
+      )}
 
       <div className="section">
-        <SectionHeader title="핸드메이드 · 워크웨어" sub="한 점씩 만드는 셀러" more="전체" href="/sellers/foldstudio" />
+        <SectionHeader title="핸드메이드 · 워크웨어" sub="한 점씩 만드는 셀러" more="전체" href="/category" />
         <ProductGrid items={handmade} variant={cardVariant} />
       </div>
 
-      <HomePromo />
+      <HomePromo seller={promoSeller} />
       <Foot />
     </div>
   );

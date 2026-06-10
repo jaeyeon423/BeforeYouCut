@@ -91,10 +91,11 @@ export const getHomeData = cache(() => {
   return unstable_cache(
     async () => {
       try {
-        const [rankingRows, newRows, handmadeRows] = await Promise.all([
+        const [rankingRows, newRows, handmadeRows, spotlightSellers] = await Promise.all([
           prisma.product.findMany({ where: { id: { in: RANKING_IDS } } }),
           prisma.product.findMany({ where: { badge: { in: ["new", "best"] } }, take: 6 }),
           prisma.product.findMany({ where: { cat: { in: HANDMADE_CATS } }, take: 4 }),
+          prisma.seller.findMany({ take: 2, orderBy: { since: "desc" } }),
         ]);
 
         // Preserve the curated ranking order.
@@ -105,10 +106,11 @@ export const getHomeData = cache(() => {
           ranking,
           newItems: newRows.map(formatProduct),
           handmade: handmadeRows.map(formatProduct),
+          spotlightSellers: spotlightSellers.map(formatSeller),
         };
       } catch (error) {
         console.error("Failed to load home data:", error);
-        return { ranking: [], newItems: [], handmade: [] };
+        return { ranking: [], newItems: [], handmade: [], spotlightSellers: [] };
       }
     },
     ["home-data"],
