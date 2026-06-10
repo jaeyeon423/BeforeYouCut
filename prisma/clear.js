@@ -3,7 +3,6 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -15,12 +14,20 @@ let connectionString =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL;
 
+let cleanUrl = connectionString;
 if (connectionString) {
-  connectionString = connectionString.replace(/^["']|["']$/g, '');
+  cleanUrl = connectionString.replace(/^["']|["']$/g, '');
+  try {
+    const parsedUrl = new URL(cleanUrl);
+    parsedUrl.searchParams.delete('sslmode');
+    cleanUrl = parsedUrl.toString();
+  } catch (e) {
+    console.error("Failed to parse database connection URL:", e);
+  }
 }
 
 const pool = new Pool({
-  connectionString,
+  connectionString: cleanUrl,
   ssl: {
     rejectUnauthorized: false,
   },
