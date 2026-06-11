@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-export async function proxy(request) {
+export async function middleware(request) {
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -30,7 +30,9 @@ export async function proxy(request) {
     }
   );
 
-  // Refresh session if expired
+  // Refresh the session token if expired.
+  // getUser() validates against the Supabase Auth API and writes the refreshed
+  // token back into the response cookies. Do not replace this with getSession().
   await supabase.auth.getUser();
 
   return supabaseResponse;
@@ -43,7 +45,6 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

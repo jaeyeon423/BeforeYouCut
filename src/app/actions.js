@@ -48,10 +48,17 @@ function formatProduct(p) {
   };
 }
 
-// Resolve the currently authenticated user id (or null) on the server.
-async function getAuthUserId() {
+// supabase.auth.getUser() makes a network call to the Auth API on every invocation.
+// cache() memoizes the result for the lifetime of the current server request so that
+// multiple Server Actions or RSCs that need the user only pay the network round-trip once.
+const getAuthUser = cache(async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  return user || null;
+});
+
+async function getAuthUserId() {
+  const user = await getAuthUser();
   return user?.id || null;
 }
 
@@ -303,12 +310,9 @@ export async function getUserOrders() {
  */
 export async function toggleLike(productId) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("로그인이 필요합니다.");
-    }
-    const activeUserId = user.id;
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+    const activeUserId = authUser.id;
 
     if (!productId || typeof productId !== 'string' || productId.trim() === '') {
       throw new Error("올바르지 않은 상품 ID입니다.");
@@ -360,12 +364,9 @@ export async function toggleLike(productId) {
  */
 export async function toggleFollow(sellerId) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("로그인이 필요합니다.");
-    }
-    const activeUserId = user.id;
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+    const activeUserId = authUser.id;
 
     if (!sellerId || typeof sellerId !== 'string' || sellerId.trim() === '') {
       throw new Error("올바르지 않은 셀러 ID입니다.");
@@ -401,12 +402,9 @@ export async function toggleFollow(sellerId) {
  */
 export async function createOrder({ name, address, total, items }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("로그인이 필요합니다.");
-    }
-    const activeUserId = user.id;
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+    const activeUserId = authUser.id;
 
     // Input validations
     if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -469,11 +467,8 @@ export async function createOrder({ name, address, total, items }) {
  */
 export async function createSeller({ sellerId, name, desc, category, story, notice, firstProduct }) {
   try {
-    const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) {
-      throw new Error("로그인이 필요합니다.");
-    }
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
     const activeUserId = authUser.id;
     
     // Input validations
@@ -591,11 +586,8 @@ export async function createSeller({ sellerId, name, desc, category, story, noti
  */
 export async function syncUser({ name } = {}) {
   try {
-    const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) {
-      throw new Error("인증되지 않은 사용자입니다.");
-    }
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("인증되지 않은 사용자입니다.");
     const id = authUser.id;
     const email = authUser.email;
 
@@ -633,8 +625,7 @@ export async function syncUser({ name } = {}) {
  */
 export async function recordConsents({ consentedTypes, ipAddress, userAgent }) {
   try {
-    const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const authUser = await getAuthUser();
     if (!authUser) throw new Error("로그인이 필요합니다.");
 
     if (!Array.isArray(consentedTypes) || consentedTypes.length === 0) {
