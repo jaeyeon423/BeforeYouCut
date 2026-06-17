@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import {
   createOrder,
-  createSeller,
   getCategoryProducts,
   recordConsents,
 } from '@/app/actions';
@@ -542,7 +541,6 @@ export function MyScreen({ orders = [] }) {
   const { user, signOut } = useAuth();
   const supabase = createClient();
 
-  const [onboardOpen, setOnboardOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
 
@@ -553,48 +551,6 @@ export function MyScreen({ orders = [] }) {
   // 회원가입 약관 동의 상태
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentPrivacy, setConsentPrivacy] = useState(false);
-
-  const [brandName, setBrandName] = useState("");
-  const [brandCategory, setBrandCategory] = useState("도구");
-  const [brandDesc, setBrandDesc] = useState("");
-  const [brandNotice, setBrandNotice] = useState("");
-  const [brandStory, setBrandStory] = useState("");
-  const [prodName, setProdName] = useState("");
-  const [prodPrice, setProdPrice] = useState("");
-  const [onboardLoading, setOnboardLoading] = useState(false);
-
-  const handleOnboardSubmit = async (e) => {
-    e.preventDefault();
-    if (!brandName.trim()) return;
-
-    setOnboardLoading(true);
-    const cleanBrandName = brandName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const slugPrefix = cleanBrandName || "brand";
-    const sellerId = (slugPrefix + Date.now().toString().slice(-4)).slice(0, 20);
-
-    try {
-      const res = await createSeller({
-        sellerId,
-        name: brandName,
-        desc: brandDesc,
-        category: brandCategory,
-        story: brandStory,
-        notice: brandNotice,
-        firstProduct: prodName ? { name: prodName, price: Number(prodPrice) } : null,
-      });
-      if (res?.success) {
-        showToast("브랜드 입점 신청이 완료되었습니다!");
-        setBrandName(""); setBrandDesc(""); setBrandNotice(""); setBrandStory(""); setProdName(""); setProdPrice("");
-        setOnboardOpen(false);
-        router.refresh();
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || "입점 신청에 실패했습니다.");
-    } finally {
-      setOnboardLoading(false);
-    }
-  };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -684,17 +640,21 @@ export function MyScreen({ orders = [] }) {
 
       <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => {
         if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
-        setOnboardOpen(true);
+        router.push("/seller");
       }}>
-        <div className="bp-kicker">FOR SELLERS</div>
-        <div className="bp-title">내 브랜드를<br/>입점시키기</div>
-        <div className="bp-sub">미용인이라면 누구나 셀러가 될 수 있어요. 입점하고 상품을 등록해 보세요.</div>
+        <div className="bp-kicker">SELLER CENTER</div>
+        <div className="bp-title">판매자 센터로<br/>전환하기</div>
+        <div className="bp-sub">입점 신청, 상품 상세 구성, 주문·정산 관리는 판매자 전용 화면에서 진행합니다.</div>
         <div className="bp-arrow"><Icon name="store" size={22} /></div>
       </div>
 
       <div style={{ marginTop: 24 }}>
         {[
           { label: "주문 내역", action: () => setHistoryOpen(true) },
+          { label: "판매자 센터", action: () => {
+            if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
+            router.push("/seller");
+          } },
           { label: "팔로우한 브랜드", action: () => setFollowingOpen(true) },
           { label: "최근 본 상품", action: () => {} },
           { label: "리뷰 관리", action: () => {} },
@@ -709,38 +669,6 @@ export function MyScreen({ orders = [] }) {
         ))}
       </div>
       <Foot />
-
-      {onboardOpen && (
-        <ModalSheet title="내 브랜드 셀러 신청" onClose={() => setOnboardOpen(false)} maxHeight="90%">
-          <form onSubmit={handleOnboardSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <label style={sheetLabel}>브랜드 정보</label>
-              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-                <input style={sheetInput} value={brandName} onChange={(e) => setBrandName(e.target.value)} required placeholder="브랜드명" />
-                <select value={brandCategory} onChange={(e) => setBrandCategory(e.target.value)}
-                  style={{ border: "1px solid var(--line)", background: "var(--surface)", borderRadius: 6, padding: 10, fontSize: 13, outline: "none", flex: 1 }}>
-                  {["도구", "가위", "클리퍼", "빗·브러시", "앞치마·유니폼", "소모품", "핸드메이드"].map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <input style={{ ...sheetInput, width: "100%" }} value={brandDesc} onChange={(e) => setBrandDesc(e.target.value)} placeholder="한 줄 소개 (예: 단조 수제 가위 전문)" />
-            <input style={{ ...sheetInput, width: "100%" }} value={brandNotice} onChange={(e) => setBrandNotice(e.target.value)} placeholder="공지 사항 (예: 신규 회원 10% 쿠폰)" />
-            <textarea value={brandStory} onChange={(e) => setBrandStory(e.target.value)} placeholder="브랜드 스토리를 작성해 주세요. (가치관, 제작 방식 등)" style={{ ...sheetTextarea, height: 80, marginBottom: 0 }} />
-            <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-              <label style={{ ...sheetLabel, display: "block", marginBottom: 6 }}>첫 상품 등록 (선택)</label>
-              <div style={{ display: "flex", gap: 10 }}>
-                <input style={{ ...sheetInput, flex: 2 }} value={prodName} onChange={(e) => setProdName(e.target.value)} placeholder="상품명" />
-                <input style={{ ...sheetInput, flex: 1 }} type="number" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} placeholder="가격(원)" />
-              </div>
-            </div>
-            <button className="buy" type="submit" style={{ width: "100%", marginTop: 10 }} disabled={onboardLoading}>
-              {onboardLoading ? "신청 중..." : "입점 및 상품 등록"}
-            </button>
-          </form>
-        </ModalSheet>
-      )}
 
       {historyOpen && (
         <ModalSheet title="주문 내역" onClose={() => setHistoryOpen(false)} maxHeight="85%">

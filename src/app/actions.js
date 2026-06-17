@@ -24,6 +24,11 @@ function formatSeller(s) {
     story: s.story,
     notice: s.notice,
     userId: s.userId,
+    sellerType: s.sellerType,
+    businessName: s.businessName,
+    businessRegNo: s.businessRegNo,
+    representative: s.representative,
+    isActive: s.isActive,
   };
 }
 
@@ -578,6 +583,155 @@ export async function createSeller({ sellerId, name, desc, category, story, noti
   } catch (error) {
     console.error("Failed to onboard seller brand:", error);
     throw new Error(error.message || "브랜드 입점 신청에 실패했습니다.");
+  }
+}
+
+/**
+ * Current seller's private dashboard data.
+ * This is intentionally not cached because it is user-scoped operational data.
+ */
+export async function getSellerDashboard() {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) {
+      return { status: "guest", seller: null, products: [], orders: [], settlements: [] };
+    }
+
+    const seller = await prisma.seller.findUnique({
+      where: { userId: authUser.id },
+    });
+    if (!seller) {
+      return { status: "noSeller", seller: null, products: [], orders: [], settlements: [] };
+    }
+
+    const [products, orderItems, settlements] = await Promise.all([
+      prisma.product.findMany({
+        where: { sellerId: seller.id },
+        orderBy: { name: "asc" },
+      }),
+      prisma.orderItem.findMany({
+        where: { product: { sellerId: seller.id } },
+        include: {
+          product: { select: { id: true, name: true, icon: true, tone: true } },
+          order: { select: { id: true, status: true, date: true, name: true, total: true, address: true } },
+        },
+        orderBy: { order: { date: "desc" } },
+        take: 20,
+      }),
+      prisma.settlement.findMany({
+        where: { sellerId: seller.id },
+        include: {
+          orderItem: { include: { product: { select: { name: true } }, order: { select: { date: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+    ]);
+
+    const totalSales = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const pendingOrders = orderItems.filter((item) => !["배송완료", "구매확정", "취소", "환불완료"].includes(item.order.status)).length;
+    const pendingSettlement = settlements
+      .filter((s) => s.status !== "PAID")
+      .reduce((sum, s) => sum + s.netAmount, 0);
+
+    return {
+      status: "seller",
+      seller: formatSeller(seller),
+      stats: {
+        products: products.length,
+        totalSales,
+        pendingOrders,
+        pendingSettlement,
+      },
+      products: products.map(formatProduct),
+      orders: orderItems.map((item) => ({
+        id: item.order.id,
+        itemId: item.id,
+        productId: item.product.id,
+        productName: item.product.name,
+        icon: item.product.icon,
+        tone: item.product.tone,
+        buyer: item.order.name,
+        status: item.order.status,
+        date: item.order.date.toLocaleDateString("ko-KR"),
+        total: item.order.total,
+        itemTotal: item.price * item.quantity,
+        quantity: item.quantity,
+        address: item.order.address,
+      })),
+      settlements: settlements.map((s) => ({
+        id: s.id,
+        productName: s.orderItem.product.name,
+        saleAmount: s.saleAmount,
+        commissionAmount: s.commissionAmount,
+        netAmount: s.netAmount,
+        status: s.status,
+        createdAt: s.createdAt.toLocaleDateString("ko-KR"),
+        settledAt: s.settledAt ? s.settledAt.toLocaleDateString("ko-KR") : null,
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to load seller dashboard:", error);
+    return { status: "error", error: error.message, seller: null, products: [], orders: [], settlements: [] };
+  }
+}
+
+/**
+ * Let a seller compose the buyer-facing product detail page for their own item.
+ */
+export async function updateSellerProductDetail({ productId, name, price, desc, spec }) {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+
+    const seller = await prisma.seller.findUnique({ where: { userId: authUser.id } });
+    if (!seller) throw new Error("판매자 계정이 없습니다.");
+
+    if (!productId || typeof productId !== "string") {
+      throw new Error("올바르지 않은 상품 ID입니다.");
+    }
+    if (!name || typeof name !== "string" || !name.trim()) {
+      throw new Error("상품명은 필수입니다.");
+    }
+    const numericPrice = Number(price);
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+      throw new Error("가격은 0보다 커야 합니다.");
+    }
+    if (!desc || typeof desc !== "string" || !desc.trim()) {
+      throw new Error("상품 설명은 필수입니다.");
+    }
+    if (!Array.isArray(spec)) {
+      throw new Error("상품 정보 형식이 올바르지 않습니다.");
+    }
+
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.sellerId !== seller.id) {
+      throw new Error("수정 권한이 없습니다.");
+    }
+
+    const cleanSpec = spec
+      .map(([key, value]) => [String(key || "").trim(), String(value || "").trim()])
+      .filter(([key, value]) => key && value);
+
+    const updated = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        name: name.trim(),
+        price: Math.round(numericPrice),
+        desc: desc.trim(),
+        spec: cleanSpec,
+      },
+    });
+
+    revalidateTag("products");
+    revalidateTag(`product-${productId}`);
+    revalidateTag(`seller-${seller.id}`);
+    revalidateTag("home");
+
+    return { success: true, product: formatProduct(updated) };
+  } catch (error) {
+    console.error("Failed to update seller product detail:", error);
+    throw new Error(error.message || "상품 상세 저장에 실패했습니다.");
   }
 }
 
