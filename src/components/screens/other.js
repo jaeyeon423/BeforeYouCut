@@ -27,6 +27,7 @@ import {
   POPULAR_KEYWORDS,
   won,
 } from '../../data/data';
+import { parseProductSpec, splitDetailLines } from '@/utils/product-detail';
 import { Foot } from './home';
 
 // ============================================================
@@ -64,7 +65,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
   if (filter === "new") {
     displayTitle = `${cat} · 신상품`;
   } else if (filter === "best") {
-    displayTitle = `${cat} · 실시간 랭킹`;
+    displayTitle = `${cat} · 우선 검토`;
   }
 
   return (
@@ -171,13 +172,27 @@ export function SearchScreen({ products = [] }) {
 // PRODUCT DETAIL
 // ============================================================
 export function DetailScreen({ product: p, seller, related = [] }) {
-  const { likes, toggleLike, following, toggleFollow, showToast } = useApp();
+  const { likes, toggleLike, showToast } = useApp();
   const { addCart } = useCart();
   const s = seller || { id: p.seller, name: p.seller, category: "도구", followers: "0", products: 0, tone: "tone-a" };
   const [dot, setDot] = useState(0);
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryText, setInquiryText] = useState("");
   const liked = likes.has(p.id);
+  const { rows: specRows, details } = parseProductSpec(p.spec);
+  const detailIntro = details.intro || p.desc || `${s.name}가 구성한 ${p.cat} 상품입니다. 상세 정보와 판매자 안내를 확인한 뒤 주문해 주세요.`;
+  const highlights = splitDetailLines(details.highlights);
+  const usageTips = details.usage || "사용 후 마른 천으로 닦아 습기가 적은 곳에 보관해 주세요. 날이 있는 도구는 충격과 낙하에 주의해 주세요.";
+  const shippingGuide = details.shipping || "평균 2영업일 내 출고됩니다. 도서산간 지역은 배송 기간이 더 소요될 수 있습니다.";
+  const returnGuide = details.returns || "상품 수령 후 7일 이내 미사용 상품에 한해 교환/반품 신청이 가능합니다. 사용 흔적이 있거나 구성품이 훼손된 경우 제한될 수 있습니다.";
+  const purchaseNotice = details.notice || "상품별 소재, 치수, 인증 대상 여부를 확인해 주세요. 수작업 상품은 미세한 마감 차이가 있을 수 있습니다.";
+  const fallbackHighlights = [
+    `${s.name} 판매자가 직접 구성한 상세 정보`,
+    `${p.cat} 카테고리에 맞춘 사용/관리 안내`,
+    "구매 전 확인사항과 판매자 정보를 한 화면에서 확인",
+  ];
+  const visibleHighlights = highlights.length > 0 ? highlights : fallbackHighlights;
+  const mediaCaptions = ["제품 전체", "사용 포인트", "구성 정보"];
 
   const handleInquireSubmit = (e) => {
     e.preventDefault();
@@ -193,6 +208,10 @@ export function DetailScreen({ product: p, seller, related = [] }) {
         <div className="pd-media">
           <Placeholder icon={p.icon} tone={p.tone} size={92} />
           {p.badge && <span className={"badge " + p.badge} style={{ top: 14, left: 14 }}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
+          <div className="pd-media-caption">
+            <span>{mediaCaptions[dot]}</span>
+            <b>{p.name}</b>
+          </div>
           <div className="pd-dots">{[0, 1, 2].map((i) => <i key={i} className={i === dot ? "on" : ""} onClick={() => setDot(i)} />)}</div>
         </div>
 
@@ -211,31 +230,74 @@ export function DetailScreen({ product: p, seller, related = [] }) {
             <span className="pd-price">{won(p.price)}원</span>
             {p.orig ? <span className="pd-orig">{won(p.orig)}원</span> : null}
           </div>
-          {p.desc && <p style={{ fontSize: 13.5, color: "var(--ink-soft)", lineHeight: 1.6, marginTop: 14 }}>{p.desc}</p>}
-          <div className="pd-rating" style={{ marginTop: 14, color: "var(--ink-soft)" }}>
-            <Icon name="ship" size={18} /><span>무료배송 · 평균 2일 내 출고</span>
+          {p.desc && <p className="pd-summary">{p.desc}</p>}
+          <div className="pd-trust-grid">
+            <div><Icon name="ship" size={17} /><span>평균 2일 출고</span></div>
+            <div><Icon name="check" size={17} /><span>판매자 직접 검수</span></div>
+            <div><Icon name="store" size={17} /><span>브랜드 공식 상품</span></div>
+            <div><Icon name="bell" size={17} /><span>문의 가능</span></div>
+          </div>
+          <div className="pd-action-row">
+            <button type="button" className="pd-secondary-action" onClick={() => setInquireOpen(true)}>
+              <Icon name="bell" size={17} /> 상품 문의
+            </button>
+            <Link href={`/sellers/${s.id}`} className="pd-secondary-action">
+              <Icon name="store" size={17} /> 브랜드 보기
+            </Link>
           </div>
         </div>
 
         <div className="pd-divider" />
 
+        <div className="pd-detail-hero">
+          <div className="pd-kicker">DETAIL STORY</div>
+          <h2>{p.name}</h2>
+          <p>{detailIntro}</p>
+          <div className="pd-highlight-list">
+            {visibleHighlights.map((item) => (
+              <div key={item}><Icon name="check" size={16} /><span>{item}</span></div>
+            ))}
+          </div>
+        </div>
+
         <Link href={`/sellers/${s.id}`} className="pd-sellerstrip" style={{ textDecoration: "none", color: "inherit" }}>
           <div className="ss-logo"><Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone} size={22} /></div>
           <div className="ss-info">
             <div className="ss-name">{s.name}{s.verified && <Verified size={12} />}</div>
-            <div className="ss-meta">입점 셀러 · 팔로워 {s.followers} · 상품 {s.products}개</div>
+            <div className="ss-meta">입점 셀러 · 상품 {s.products}개 · A/S 안내 확인</div>
           </div>
-          <span className={"btn-follow" + (following.has(s.id) ? " on" : "")} role="button" tabIndex={0}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow(s.id); }}>
-            {following.has(s.id) ? "팔로잉" : "+ 팔로우"}
-          </span>
+          <span className="btn-follow" aria-hidden="true">판매자 정보</span>
         </Link>
 
-        {p.spec && p.spec.length > 0 && (
+        <div className="pd-block">
+          <h5>사용과 관리</h5>
+          <p className="pd-paragraph">{usageTips}</p>
+        </div>
+
+        <div className="pd-block">
+          <h5>배송 · 교환 · 반품</h5>
+          <div className="pd-guide-grid">
+            <div>
+              <b>배송 안내</b>
+              <p>{shippingGuide}</p>
+            </div>
+            <div>
+              <b>교환/반품</b>
+              <p>{returnGuide}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="pd-block">
+          <h5>구매 전 확인사항</h5>
+          <p className="pd-paragraph">{purchaseNotice}</p>
+        </div>
+
+        {specRows.length > 0 && (
           <div className="pd-block">
             <h5>상품 정보</h5>
             <dl style={{ margin: 0 }}>
-              {p.spec.map(([k, v]) => (
+              {specRows.map(([k, v]) => (
                 <div key={k} className="pd-spec"><dt>{k}</dt><dd>{v}</dd></div>
               ))}
             </dl>
@@ -297,12 +359,11 @@ export function DetailScreen({ product: p, seller, related = [] }) {
 // SELLER PROFILE
 // ============================================================
 export function SellerScreen({ seller, products = [] }) {
-  const { following, toggleFollow, showToast } = useApp();
+  const { showToast } = useApp();
   const s = seller || { id: "", name: "알 수 없는 브랜드", category: "도구", desc: "", followers: "0", products: 0, tone: "tone-a", story: [] };
   const [tab, setTab] = useState("상품");
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryText, setInquiryText] = useState("");
-  const isF = following.has(s.id);
 
   const handleInquireSubmit = (e) => {
     e.preventDefault();
@@ -321,11 +382,10 @@ export function SellerScreen({ seller, products = [] }) {
         <div className="sp-tagline">{s.desc} · since {s.since || "2026"}</div>
         <div className="sp-stats">
           <div className="sp-stat"><span className="num">{products.length}</span><span className="lbl">상품</span></div>
-          <div className="sp-stat"><span className="num">{s.followers}</span><span className="lbl">팔로워</span></div>
-          <div className="sp-stat"><span className="num">{s.category}</span><span className="lbl">카테고리</span></div>
+          <div className="sp-stat"><span className="num">{s.category}</span><span className="lbl">전문분야</span></div>
+          <div className="sp-stat"><span className="num">{s.since || "2026"}</span><span className="lbl">입점연도</span></div>
         </div>
         <div className="sp-actions">
-          <button className={"btn-follow" + (isF ? " on" : "")} onClick={() => toggleFollow(s.id)}>{isF ? "팔로잉" : "+ 팔로우"}</button>
           <button className="btn-ghost" onClick={() => setInquireOpen(true)}>문의하기</button>
         </div>
       </div>
@@ -337,7 +397,7 @@ export function SellerScreen({ seller, products = [] }) {
       )}
 
       <div className="sp-tabs">
-        {["상품", "브랜드 스토리", "리뷰"].map((t) => (
+        {["상품", "제작/검수"].map((t) => (
           <button key={t} className={"sp-tab" + (tab === t ? " active" : "")} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
@@ -347,18 +407,11 @@ export function SellerScreen({ seller, products = [] }) {
           <ProductGrid items={products} variant="meta" />
         </div>
       )}
-      {tab === "브랜드 스토리" && (
+      {tab === "제작/검수" && (
         <div className="sp-story">
-          {s.story && s.story.length > 0 ? s.story.map((para, i) => <p key={i}>{para}</p>) : <p>작성된 브랜드 스토리가 없습니다.</p>}
+          {s.story && s.story.length > 0 ? s.story.map((para, i) => <p key={i}>{para}</p>) : <p>등록된 제작/검수 안내가 없습니다.</p>}
           <div className="tag-strip">
-            {["#" + s.category, "#입점셀러", "#수제", "#since" + (s.since || "2026")].map((t) => <span key={t} className="t">{t}</span>)}
-          </div>
-        </div>
-      )}
-      {tab === "리뷰" && (
-        <div className="sp-story">
-          <div style={{ padding: "40px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-            등록된 리뷰가 없습니다.
+            {["#" + s.category, "#검수", "#A/S안내", "#since" + (s.since || "2026")].map((t) => <span key={t} className="t">{t}</span>)}
           </div>
         </div>
       )}
@@ -537,12 +590,11 @@ export function CartScreen() {
 // ============================================================
 export function MyScreen({ orders = [] }) {
   const router = useRouter();
-  const { sellers, following, likes, toggleFollow, showToast } = useApp();
+  const { sellers, likes, showToast } = useApp();
   const { user, signOut } = useAuth();
   const supabase = createClient();
 
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [followingOpen, setFollowingOpen] = useState(false);
 
   const [authOpen, setAuthOpen] = useState(null); // 'signin' | 'signup' | null
   const [authEmail, setAuthEmail] = useState("");
@@ -628,7 +680,10 @@ export function MyScreen({ orders = [] }) {
         {[
           ["주문", String(orders.length), () => setHistoryOpen(true)],
           ["저장", String(likes.size), () => router.push("/saved")],
-          ["적립금", "0", null],
+          ["판매자", "센터", () => {
+            if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
+            router.push("/seller");
+          }],
         ].map(([l, v, action], i) => (
           <div key={l} onClick={action || undefined}
             style={{ flex: 1, padding: "16px 0", textAlign: "center", borderLeft: i ? "1px solid var(--line)" : "none", cursor: action ? "pointer" : "default" }}>
@@ -655,9 +710,7 @@ export function MyScreen({ orders = [] }) {
             if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
             router.push("/seller");
           } },
-          { label: "팔로우한 브랜드", action: () => setFollowingOpen(true) },
-          { label: "최근 본 상품", action: () => {} },
-          { label: "리뷰 관리", action: () => {} },
+          { label: "저장한 도구", action: () => router.push("/saved") },
           { label: "고객센터", action: () => {} },
           { label: "설정", action: () => {} },
         ].map((item, i) => (
@@ -696,29 +749,6 @@ export function MyScreen({ orders = [] }) {
               </div>
             )) : (
               <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>주문하신 내역이 없습니다.</div>
-            )}
-          </div>
-        </ModalSheet>
-      )}
-
-      {followingOpen && (
-        <ModalSheet title="팔로우한 브랜드" onClose={() => setFollowingOpen(false)} maxHeight="85%">
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {Array.from(following).length > 0 ? Array.from(following).map((fid) => {
-              const s = sellers[fid] || { name: fid, category: "도구", desc: "전문 셀러" };
-              return (
-                <div key={fid} style={{ display: "flex", alignItems: "center", gap: 12, border: "1px solid var(--line)", borderRadius: 8, padding: 10, cursor: "pointer" }}
-                  onClick={() => { setFollowingOpen(false); router.push(`/sellers/${fid}`); }}>
-                  <Placeholder icon={CAT_ICON[s.category] || "scissors"} tone={s.tone || "tone-a"} size={22} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{s.desc}</div>
-                  </div>
-                  <button className="icon-btn" style={{ color: "var(--muted)" }} onClick={(e) => { e.stopPropagation(); toggleFollow(fid); }}><Icon name="close" size={16} /></button>
-                </div>
-              );
-            }) : (
-              <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>팔로우한 브랜드가 없습니다.</div>
             )}
           </div>
         </ModalSheet>

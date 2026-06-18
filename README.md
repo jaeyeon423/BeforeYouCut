@@ -4,6 +4,8 @@
 
 이 프로젝트는 로컬 시뮬레이터 프로토타입에서 출발하여, **Supabase PostgreSQL 데이터베이스** 및 **Prisma ORM**을 백엔드로 연동하고 Vercel에 배포할 수 있도록 설계된 실서비스 가능한 프로덕션급 웹 애플리케이션입니다.
 
+> AI 에이전트와 신규 개발자는 전체 파일을 훑기 전에 [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md)를 먼저 읽으십시오. 현재 route/file map, 최근 의사결정, 검증 명령어를 짧게 정리해 두었습니다.
+
 ---
 
 ## 🛠️ 기술 스택 (Technical Stack)
@@ -14,7 +16,7 @@
 | **Frontend** | **React 19**, **Vanilla CSS** | 미니멀 매거진 감성의 Mono 테마 UI 구현, 모바일 safe-area 및 dynamic viewport (`100dvh`) 최적화 |
 | **ORM** | **Prisma 7.8** | 스키마 관계 정의 및 데이터 쿼리용 ORM (Prisma 7 CLI 전용 Config 분리) |
 | **Database** | **Supabase (PostgreSQL)** | 실시간 관계형 데이터베이스 및 트랜잭션/세션 커넥션 풀링 관리 |
-| **Auth** | **Supabase Auth** | 이메일/비밀번호 인증 연동 및 게스트 사용자(`user_default`) Fallback 매핑 |
+| **Auth** | **Supabase Auth** | 이메일/비밀번호 인증 연동. 비로그인 사용자는 읽기 중심으로 탐색하고 쓰기 동작 시 로그인 유도 |
 | **Driver** | **pg (node-postgres)** | Node.js 환경에서 Prisma의 PostgreSQL 통신을 위한 드라이버 어댑터 (`@prisma/adapter-pg`) 적용 |
 | **Deployment** | **Vercel** / **GitHub** | GitHub 커밋 자동 빌드 및 실시간 Vercel 서버리스 환경 배포 |
 
@@ -52,12 +54,14 @@ graph TD
     *   `page.js`: 홈/검색/장바구니/마이페이지 탭 전환 및 클라이언트 상태 관리 로직
     *   `layout.js`: Pretendard & Newsreader 웹 폰트 로드 및 루트 레이아웃 바인딩
     *   `proxy.js`: Supabase 인증 쿠키 세션을 자동으로 리프레시해주는 Next.js 16 규격 미들웨어 프록시
+    *   `seller/page.js`: 입점 신청, 상품 상세 구성, 주문·정산 요약을 제공하는 판매자 센터
 *   `src/components/`
     *   `icons.js`: SVG 기반의 미니멀 아이콘 팩 컴포넌트
     *   `ui.js`: 탑바, 바텀 네비게이션, 상품 카드, 브랜드 전용 카드 등 공용 레이아웃 컴포넌트
     *   `screens/`
         *   `home.js`: 매거진 레이아웃 및 브랜드 링 레일이 배치된 메인 화면
-        *   `other.js`: 검색, 상세 정보, 장바구니/결제, 입점 신청 및 Auth 기능이 포함된 스크린 컴포넌트 모음
+        *   `other.js`: 검색, 상품 상세, 셀러 공개 페이지, 장바구니/결제, 마이페이지 및 Auth 기능이 포함된 스크린 컴포넌트 모음
+        *   `seller-dashboard.js`: 판매자 입점 시작, 상품 상세 구성, 주문·정산 관리 화면
 *   `src/utils/`
     *   `prisma.js`: Node-Postgres 어댑터 풀링 및 TLS 자가서명 인증서 검증 우회 설정을 담은 **Prisma Client 싱글톤**
     *   `supabase/`: 쿠키 상태 및 브라우저 세션을 연동하기 위한 Supabase SSR 클라이언트 팩토리 (`client.js`, `server.js`)

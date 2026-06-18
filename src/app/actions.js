@@ -4,6 +4,7 @@ import { prisma } from "../utils/prisma";
 import { createClient } from "../utils/supabase/server";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { cache } from "react";
+import { buildProductSpec } from "@/utils/product-detail";
 
 // ============================================================
 //  Internal formatters & helpers (not exported → not server actions)
@@ -341,8 +342,8 @@ export async function toggleLike(productId) {
           data: { likesCount: { decrement: 1 } },
         }),
       ]);
-      revalidateTag(`product-${productId}`);
-      revalidateTag("home");
+      revalidateTag(`product-${productId}`, "max");
+      revalidateTag("home", "max");
       return { liked: false };
     } else {
       await prisma.$transaction([
@@ -354,8 +355,8 @@ export async function toggleLike(productId) {
           data: { likesCount: { increment: 1 } },
         }),
       ]);
-      revalidateTag(`product-${productId}`);
-      revalidateTag("home");
+      revalidateTag(`product-${productId}`, "max");
+      revalidateTag("home", "max");
       return { liked: true };
     }
   } catch (error) {
@@ -548,7 +549,25 @@ export async function createSeller({ sellerId, name, desc, category, story, noti
             badge: "new",
             desc: `${firstProduct.name} 설명입니다.`,
             sellerId: sellerId,
-            spec: [["입점일", new Date().toLocaleDateString("ko-KR")]],
+            spec: buildProductSpec(
+              [
+                ["입점일", new Date().toLocaleDateString("ko-KR")],
+                ["소재", "판매자 입력 예정"],
+                ["제조국", "판매자 입력 예정"],
+                ["치수", "판매자 입력 예정"],
+                ["취급 주의", "판매자 입력 예정"],
+                ["A/S 책임자", `${name} 고객센터`],
+                ["KC 인증 여부", "판매자 확인 예정"],
+              ],
+              {
+                intro: `${firstProduct.name}의 상세 소개를 작성해 주세요.`,
+                highlights: "상품의 핵심 장점을 한 줄씩 입력해 주세요.",
+                usage: "사용 후 관리 방법과 보관법을 작성해 주세요.",
+                shipping: "출고일과 배송 정책을 작성해 주세요.",
+                returns: "교환/반품 가능 조건을 작성해 주세요.",
+                notice: "구매 전 확인해야 할 내용을 작성해 주세요.",
+              }
+            ),
           },
         });
       }
@@ -556,8 +575,8 @@ export async function createSeller({ sellerId, name, desc, category, story, noti
       return { seller, product };
     });
 
-    revalidateTag("sellers");
-    revalidateTag("home");
+    revalidateTag("sellers", "max");
+    revalidateTag("home", "max");
 
     return {
       success: true,
@@ -723,10 +742,10 @@ export async function updateSellerProductDetail({ productId, name, price, desc, 
       },
     });
 
-    revalidateTag("products");
-    revalidateTag(`product-${productId}`);
-    revalidateTag(`seller-${seller.id}`);
-    revalidateTag("home");
+    revalidateTag("products", "max");
+    revalidateTag(`product-${productId}`, "max");
+    revalidateTag(`seller-${seller.id}`, "max");
+    revalidateTag("home", "max");
 
     return { success: true, product: formatProduct(updated) };
   } catch (error) {
@@ -936,7 +955,7 @@ export async function updateShipment({ orderId, carrier, trackingNo }) {
       }),
     ]);
 
-    revalidateTag(`order-${orderId}`);
+    revalidateTag(`order-${orderId}`, "max");
     return { success: true };
   } catch (error) {
     console.error("Failed to update shipment:", error);
@@ -974,7 +993,7 @@ export async function requestRefund({ orderId, reason, reasonDetail }) {
       }),
     ]);
 
-    revalidateTag(`order-${orderId}`);
+    revalidateTag(`order-${orderId}`, "max");
     return { success: true };
   } catch (error) {
     console.error("Failed to request refund:", error);

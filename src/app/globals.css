@@ -419,6 +419,17 @@ a, .pcard, .rankrow, .brandcell {
    PRODUCT DETAIL
    ============================================================ */
 .pd-media { position: relative; width: 100%; aspect-ratio: 1 / 1; background: var(--surface); }
+.pd-media-caption {
+  position: absolute; left: 18px; right: 18px; bottom: 38px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px;
+  background: rgba(255,255,255,0.78); backdrop-filter: blur(8px);
+  font-size: 11px; color: var(--muted);
+}
+.pd-media-caption b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink); font-size: 12px;
+}
 .pd-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
 .pd-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(0,0,0,0.2); display: block; }
 .pd-dots i.on { background: var(--ink); width: 16px; border-radius: 3px; }
@@ -432,10 +443,44 @@ a, .pcard, .rankrow, .brandcell {
 .pd-disc { font-size: 22px; font-weight: 800; color: var(--accent); }
 .pd-price { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
 .pd-orig { font-size: 14px; color: var(--muted-2); text-decoration: line-through; }
+.pd-summary { font-size: 13.5px; color: var(--ink-soft); line-height: 1.65; margin: 14px 0 0; }
+.pd-trust-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px;
+}
+.pd-trust-grid div {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+  font-size: 11.5px; font-weight: 700; color: var(--ink-soft); background: #fff;
+}
+.pd-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.pd-secondary-action {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line-strong); border-radius: 8px; padding: 11px 10px;
+  background: #fff; color: var(--ink); font-family: var(--font); font-size: 12px; font-weight: 800;
+  text-decoration: none; cursor: pointer;
+}
 
 .pd-divider { height: 8px; background: var(--surface); margin-top: 22px; }
 .pd-block { padding: 22px 18px; border-bottom: 1px solid var(--line); }
 .pd-block h5 { font-size: 13px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.02em; }
+.pd-paragraph { margin: 0; font-size: 13px; color: var(--ink-soft); line-height: 1.7; }
+.pd-detail-hero { padding: 26px 18px; border-bottom: 1px solid var(--line); }
+.pd-detail-hero .pd-kicker {
+  font-size: 10px; font-weight: 900; color: var(--muted); letter-spacing: 0.08em;
+}
+.pd-detail-hero h2 { margin: 7px 0 10px; font-size: 21px; line-height: 1.28; letter-spacing: 0; }
+.pd-detail-hero p { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.72; }
+.pd-highlight-list { display: flex; flex-direction: column; gap: 9px; margin-top: 18px; }
+.pd-highlight-list div {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  font-size: 12.5px; color: var(--ink); line-height: 1.45;
+}
+.pd-highlight-list svg { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
+.pd-guide-grid { display: grid; gap: 10px; }
+.pd-guide-grid div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fff; }
+.pd-guide-grid b { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--ink); }
+.pd-guide-grid p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.65; }
 .pd-spec { display: flex; font-size: 13px; padding: 7px 0; }
 .pd-spec dt { width: 90px; color: var(--muted); flex-shrink: 0; }
 .pd-spec dd { margin: 0; color: var(--ink-soft); }

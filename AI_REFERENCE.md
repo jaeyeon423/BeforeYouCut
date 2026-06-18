@@ -1,6 +1,8 @@
 # BEFORE YOU CUT — AI & Developer Reference Guide
 
-이 문서는 **BEFORE YOU CUT** 프로젝트의 설계, 아키텍처, 데이터 모델 및 Next.js 16/React 19 개발 규칙을 설명하는 AI 에이전트 및 개발자 참조 가이드입니다. 
+이 문서는 **BEFORE YOU CUT** 프로젝트의 설계, 아키텍처, 데이터 모델 및 Next.js 16/React 19 개발 규칙을 설명하는 AI 에이전트 및 개발자 참조 가이드입니다.
+
+> 빠른 작업 시작은 [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md)를 먼저 읽으십시오. 이 문서는 더 깊은 아키텍처 설명이 필요할 때 보조 참조로 사용합니다.
 
 ---
 
@@ -15,8 +17,9 @@
    - 상품 **찜(Like)** 및 셀러 **팔로우(Follow)**.
    - 장바구니에 상품을 담고 주문/결제 진행.
 2. **셀러 (Seller)**
-   - 입점 신청(Onboarding)을 통해 브랜드 프로필 생성 및 첫 상품 등록.
-   - 입점 완료 시 유저의 `role`이 `SELLER`로 업데이트되며 전용 브랜드 페이지 제공.
+   - `/seller` 판매자 센터에서 입점 신청(Onboarding)을 통해 브랜드 프로필 생성 및 첫 상품 등록.
+   - 입점 완료 시 유저의 `role`이 `SELLER`로 업데이트되며 공개 브랜드 페이지와 판매자 전용 관리 화면 제공.
+   - 자신의 상품 상세페이지 내용, 고시 정보, 주문, 정산 현황을 판매자 화면에서 관리.
 3. **인증 (Auth)**
    - Supabase Auth(이메일/비밀번호) 연동.
    - 비로그인(게스트) 사용자는 읽기 전용으로 탐색 가능하며, 쓰기 동작(찜, 팔로우, 주문 등) 시 로그인 유도.
@@ -100,10 +103,10 @@ erDiagram
   - `actions.js`: 데이터베이스 조작을 수행하는 모든 **Server Actions** 정의.
   - `layout.js` & `page.js`: 루트 레이아웃 및 메인 홈 화면.
   - `proxy.js`: Supabase Auth 세션 갱신 헬퍼.
-  - `[route]/page.js` (cart, category, my, products, search, sellers 등): App Router 기반 각 화면 진입점.
+  - `[route]/page.js` (cart, category, my, products, search, seller, sellers 등): App Router 기반 각 화면 진입점.
 * `src/components/` : UI 컴포넌트 라이브러리.
   - `ui.js`: 헤더, 바텀 네비게이션, 상품 및 브랜드 카드 등 공용 컴포넌트.
-  - `screens/`: 각 페이지에 마운트되는 대형 스크린 컴포넌트들 (`home.js`, `other.js`).
+  - `screens/`: 각 페이지에 마운트되는 대형 스크린 컴포넌트들 (`home.js`, `other.js`, `seller-dashboard.js`).
 * `src/contexts/` : React Context 관리 (`auth-context.js`, `cart-context.js`, `app-context.js`).
 * `src/utils/` : 공통 유틸리티.
   - `prisma.js`: Node-Postgres 커넥션 풀을 활용하는 Prisma Client 싱글톤.
@@ -157,9 +160,9 @@ Next.js 16의 App Router에서는 페이지 컴포넌트나 메타데이터 제�
 
 ## 6. 주의 사항 및 미결 과제 (Known Issues)
 
-### 1. Next.js 미들웨어(Middleware) 연동 누락 가능성
-`src/proxy.js`에 Supabase 세션을 자동으로 리프레시해주는 프록시 로직이 구현되어 있지만, Next.js 프로젝트 루트 또는 `src/` 하위에 이를 실행할 **실제 `middleware.js` 파일이 부재하거나 올바르게 매핑되지 않았을 수 있습니다.**
-- **조치 요망**: 미들웨어가 필요한 경우, 프로젝트 루트 혹은 `src/middleware.js`를 신설하여 `src/proxy.js`의 `proxy` 함수를 불러와 호출하고 config matcher를 올바르게 내보내야 합니다.
+### 1. 관리자 화면 미구현
+판매자 센터(`/seller`)는 구현되어 있지만, 입점 승인, 사업자 확인, 신고 처리, 정산 검수 등을 위한 운영자 화면(`/admin`)은 아직 없습니다.
+- **조치 요망**: 운영 업무가 실제로 필요해지는 시점에 `ADMIN` 권한 기반 `/admin` 라우트를 추가하십시오.
 
 ### 2. 게스트 Fallback 제거 및 안전한 예외 처리
 이전 프로토타입에서 사용되던 공용 게스트 계정(`user_default`) 패턴이 제거되었습니다. 비로그인 상태의 사용자가 찜, 팔로우, 주문 등의 액션을 취할 경우 서버 액션 단에서 에러가 반환되므로, 클라이언트(`src/app/page.js`, 각 스크린 컴포넌트 등)에서는 적절한 로그인 유도 토스트 알림을 제공해야 합니다.

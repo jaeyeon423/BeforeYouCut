@@ -7,6 +7,13 @@ import Icon from "@/components/icons";
 import { Placeholder } from "@/components/ui";
 import { createSeller, updateSellerProductDetail } from "@/app/actions";
 import { CATEGORIES, CAT_ICON, won } from "@/data/data";
+import {
+  PRODUCT_DETAIL_FIELDS,
+  buildDetailValues,
+  buildProductSpec,
+  parseProductSpec,
+  splitDetailLines,
+} from "@/utils/product-detail";
 
 const REQUIRED_SPEC = ["소재", "제조국", "치수", "취급 주의", "A/S 책임자", "KC 인증 여부"];
 const CATEGORY_OPTIONS = CATEGORIES.filter((c) => c.key !== "전체").map((c) => c.key);
@@ -142,13 +149,16 @@ function SellerWorkspace({ dashboard }) {
 
 function ProductDetailComposer({ product }) {
   const router = useRouter();
+  const parsedSpec = parseProductSpec(product.spec);
   const [name, setName] = useState(product.name || "");
   const [price, setPrice] = useState(String(product.price || ""));
   const [desc, setDesc] = useState(product.desc || "");
-  const [specRows, setSpecRows] = useState(() => buildInitialSpecRows(product.spec));
+  const [detailValues, setDetailValues] = useState(() => buildDetailValues(parsedSpec.details, { intro: product.desc || "" }));
+  const [specRows, setSpecRows] = useState(() => buildInitialSpecRows(parsedSpec.rows));
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const missingCount = specRows.filter(([key, value]) => REQUIRED_SPEC.includes(key) && !String(value).trim()).length;
+  const previewHighlights = splitDetailLines(detailValues.highlights).slice(0, 3);
 
   const updateSpec = (index, field, value) => {
     setSpecRows((rows) => rows.map((row, i) => {
@@ -158,6 +168,9 @@ function ProductDetailComposer({ product }) {
   };
 
   const addSpec = () => setSpecRows((rows) => [...rows, ["", ""]]);
+  const updateDetail = (id, value) => {
+    setDetailValues((current) => ({ ...current, [id]: value }));
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -169,7 +182,7 @@ function ProductDetailComposer({ product }) {
           name,
           price,
           desc,
-          spec: specRows,
+          spec: buildProductSpec(specRows, detailValues),
         });
         setMessage("저장되었습니다. 구매자 상세페이지에 반영됩니다.");
         router.refresh();
@@ -190,6 +203,11 @@ function ProductDetailComposer({ product }) {
           <h3 style={styles.previewName}>{name || "상품명"}</h3>
           <div style={styles.previewPrice}>{price ? `${won(Number(price) || 0)}원` : "가격 입력"}</div>
           <p style={styles.previewDesc}>{desc || "구매자가 이해할 수 있는 상품 설명을 입력해 주세요."}</p>
+          {previewHighlights.length > 0 && (
+            <div style={styles.previewHighlights}>
+              {previewHighlights.map((item) => <span key={item}>{item}</span>)}
+            </div>
+          )}
           <Link href={`/products/${product.id}`} style={styles.previewLink}>실제 상세 보기</Link>
         </div>
       </div>
@@ -207,6 +225,28 @@ function ProductDetailComposer({ product }) {
           상품 설명
           <textarea value={desc} onChange={(e) => setDesc(e.target.value)} style={styles.textarea} />
         </label>
+
+        <div style={styles.specHead}>
+          <div>
+            <div style={styles.labelText}>상세페이지 본문</div>
+            <div style={styles.helpText}>구매자 상세페이지에 섹션별로 표시됩니다.</div>
+          </div>
+        </div>
+
+        <div style={styles.detailFields}>
+          {PRODUCT_DETAIL_FIELDS.map((field) => (
+            <label key={field.id} style={styles.label}>
+              {field.label}
+              <span style={styles.helpText}>{field.help}</span>
+              <textarea
+                value={detailValues[field.id] || ""}
+                onChange={(e) => updateDetail(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                style={field.id === "highlights" ? { ...styles.textarea, minHeight: 120 } : styles.textarea}
+              />
+            </label>
+          ))}
+        </div>
 
         <div style={styles.specHead}>
           <div>
@@ -458,6 +498,7 @@ const styles = {
   previewName: { margin: "5px 0", fontSize: 15, fontWeight: 900, color: "var(--ink)", lineHeight: 1.3 },
   previewPrice: { fontSize: 14, fontWeight: 900, color: "var(--accent)" },
   previewDesc: { margin: "8px 0", fontSize: 12, color: "var(--ink-soft)", lineHeight: 1.5 },
+  previewHighlights: { display: "flex", flexDirection: "column", gap: 4, margin: "8px 0 10px", fontSize: 11.5, color: "var(--ink)" },
   previewLink: { fontSize: 12, fontWeight: 800, color: "var(--ink)", textDecoration: "underline" },
   form: { display: "flex", flexDirection: "column", gap: 12 },
   label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 800, color: "var(--muted)" },
@@ -487,6 +528,7 @@ const styles = {
     lineHeight: 1.55,
   },
   splitRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 },
+  detailFields: { display: "flex", flexDirection: "column", gap: 12 },
   specHead: { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 4 },
   ghostButton: {
     border: "1px solid var(--line)",

@@ -5,9 +5,6 @@ import {
   Placeholder,
   SectionHeader,
   ProductRail,
-  ProductGrid,
-  BrandRail,
-  BrandCard,
 } from '../ui';
 import { won } from '../../data/data';
 import { CAT_ICON } from '../../data/data';
@@ -42,16 +39,16 @@ export function HomeHero({ seller, banner }) {
     <div className="hero">
       <Placeholder icon={CAT_ICON[seller.category] || "scissors"} tone={seller.tone || "tone-b"} size={88} />
       <div className="hero-overlay">
-        <div className="hero-kicker">This week · 추천 브랜드</div>
+        <div className="hero-kicker">전문 도구 브랜드</div>
         <h2 className="hero-title">{seller.name}</h2>
         <div className="hero-sub">{seller.desc} · since {seller.since}</div>
-        <Link href={`/sellers/${seller.id}`} className="hero-cta">브랜드 보기</Link>
+        <Link href={`/sellers/${seller.id}`} className="hero-cta">판매자 정보</Link>
       </div>
     </div>
   );
 }
 
-export function RankingList({ items }) {
+export function PriorityToolList({ items }) {
   return (
     <div>
       {items.map((p, i) => (
@@ -63,8 +60,8 @@ export function RankingList({ items }) {
             <div className="rank-name">{p.name}</div>
             <div className="rank-price">{won(p.price)}원</div>
           </div>
-          <span className="pcard-like" style={{ position: "static", color: "var(--muted-2)" }}>
-            <Icon name="heart" size={20} />
+          <span className="pcard-like" style={{ position: "static", color: "var(--muted-2)" }} aria-hidden="true">
+            <Icon name="chev-r-sm" size={20} />
           </span>
         </Link>
       ))}
@@ -84,18 +81,13 @@ export default function HomeScreen({ ranking = [], newItems = [], spotlightSelle
       <HomeHero seller={heroSeller} banner={mainBanner} />
 
       <div className="section" style={{ marginTop: 18 }}>
-        <SectionHeader title="입점 브랜드" sub="미용인이 만든 브랜드를 팔로우하세요" more="전체" href="/sellers" />
-        <BrandRail />
-      </div>
-
-      <div className="section">
-        <SectionHeader title="신상품" sub="방금 입점한 도구들" more="전체" href="/category?filter=new" />
+        <SectionHeader title="새로 등록된 전문 도구" sub="스펙과 A/S 안내를 먼저 확인하세요" more="전체" href="/category?filter=new" />
         <ProductRail items={newItems} variant={cardVariant} />
       </div>
 
       <div className="section">
-        <SectionHeader title="실시간 랭킹" sub="지금 미용인들이 담는 도구" more="더보기" href="/category?filter=best" />
-        <RankingList items={ranking} />
+        <SectionHeader title="우선 검토할 도구" sub="후기와 저장 신호가 있는 상품" more="더보기" href="/category?filter=best" />
+        <PriorityToolList items={ranking} />
       </div>
 
       <Foot />

@@ -85,7 +85,6 @@ export const CATEGORIES = [
   { key: "빗·브러시", icon: "comb", count: 173 },
   { key: "앞치마·유니폼", icon: "apron", count: 119 },
   { key: "소모품", icon: "bottle", count: 412 },
-  { key: "핸드메이드", icon: "case", count: 64 },
   { key: "케이스·수납", icon: "case", count: 38 },
   { key: "전체", icon: "grid", count: 1140 },
 ];

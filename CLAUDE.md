@@ -1,6 +1,6 @@
 # BEFORE YOU CUT — AI & Developer Reference Guide (CLAUDE.md)
 
-이 문서는 프로젝트 개발을 위한 빠른 실행 명령어 및 코딩 규칙을 안내합니다. 상세한 프로젝트 아키텍처, 데이터 모델, Next.js 16 비동기 가이드는 [AI_REFERENCE.md](file:///Users/jaeyeon423/wc/BeforeYouCut/AI_REFERENCE.md)를 참조하십시오.
+이 문서는 프로젝트 개발을 위한 빠른 실행 명령어 및 코딩 규칙을 안내합니다. 전체 저장소 분석을 줄이려면 먼저 [docs/PROJECT_CONTEXT.md](file:///Users/jaeyeon423/wc/BeforeYouCut/docs/PROJECT_CONTEXT.md)를 읽고, 상세한 프로젝트 아키텍처, 데이터 모델, Next.js 16 비동기 가이드는 [AI_REFERENCE.md](file:///Users/jaeyeon423/wc/BeforeYouCut/AI_REFERENCE.md)를 참조하십시오.
 
 ---
 
@@ -38,5 +38,6 @@
 ---
 
 ### 🔗 관련 문서 링크
+- AI 빠른 프로젝트 맥락: [docs/PROJECT_CONTEXT.md](file:///Users/jaeyeon423/wc/BeforeYouCut/docs/PROJECT_CONTEXT.md)
 - 전체 상세 아키텍처 및 DB 스키마: [AI_REFERENCE.md](file:///Users/jaeyeon423/wc/BeforeYouCut/AI_REFERENCE.md)
 - Next.js 에이전트 전용 규칙: [AGENTS.md](file:///Users/jaeyeon423/wc/BeforeYouCut/AGENTS.md)
