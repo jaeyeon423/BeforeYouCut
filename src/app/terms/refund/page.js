@@ -3,7 +3,7 @@ import siteConfig from "@/site.config";
 import TermsLayout from "../_TermsLayout";
 
 export const metadata = {
-  title: "청약철회·환불정책 — BEFORE YOU CUT",
+  title: `청약철회·환불정책 — ${siteConfig.service.name}`,
 };
 
 export default function RefundPolicyPage() {
@@ -51,7 +51,7 @@ export default function RefundPolicyPage() {
         </Section>
 
         <Section title="제5조 (통신판매중개자 책임 한계)">
-          BEFORE YOU CUT는 통신판매중개자로서 판매자와 구매자 사이의 거래를 중개합니다.
+          {siteConfig.service.name}는 통신판매중개자로서 판매자와 구매자 사이의 거래를 중개합니다.
           청약철회·환불에 관한 최종 책임은 해당 판매자에게 있으며, 플랫폼은 관련 분쟁 해결을 지원합니다.
         </Section>
 

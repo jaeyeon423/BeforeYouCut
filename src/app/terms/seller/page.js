@@ -3,12 +3,12 @@ import siteConfig from "@/site.config";
 import TermsLayout from "../_TermsLayout";
 
 export const metadata = {
-  title: "판매자(입점) 약관 — BEFORE YOU CUT",
+  title: `판매자(입점) 약관 — ${siteConfig.service.name}`,
 };
 
 export default function SellerTermsPage() {
   const { version, effectiveAt } = siteConfig.terms.sellerTerms;
-  const { business } = siteConfig;
+  const { business, service } = siteConfig;
 
   return (
     <>
@@ -17,7 +17,7 @@ export default function SellerTermsPage() {
         {/* TODO(법무 검토): 아래는 법무 검토 전 초안입니다. 시행 전 반드시 법률 전문가 검토를 받으십시오. */}
 
         <Section title="제1조 (목적)">
-          이 약관은 {business.name}(이하 &quot;회사&quot;)과 BEFORE YOU CUT 서비스에 입점하는 판매자(이하 &quot;판매자&quot;) 간의
+          이 약관은 {business.name}(이하 &quot;회사&quot;)과 {service.name} 서비스에 입점하는 판매자(이하 &quot;판매자&quot;) 간의
           서비스 이용 및 거래 처리에 관한 권리·의무를 규정합니다.
         </Section>
 

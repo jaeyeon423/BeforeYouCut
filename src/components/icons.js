@@ -32,6 +32,7 @@ export default function Icon({ name, size = 22, stroke = 1.7, fill = false, styl
     case "share":    return <svg {...p}><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg>;
     case "close":    return <svg {...p}><path d="m6 6 12 12M18 6 6 18"/></svg>;
     case "check":    return <svg {...p}><path d="m5 12 5 5 9-10"/></svg>;
+    case "lock":     return <svg {...p}><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>;
     case "verified": return <svg {...p} fill="currentColor" stroke="none"><path d="m12 2 2.4 1.8 3-.3 1 2.8 2.6 1.5-.9 2.9.9 2.9-2.6 1.5-1 2.8-3-.3L12 22l-2.4-1.8-3 .3-1-2.8L3 16.5l.9-2.9L3 10.6l2.6-1.5 1-2.8 3 .3L12 2Z"/><path d="m8.5 12 2.3 2.3 4.7-4.8" stroke="#fff" strokeWidth="1.8" fill="none"/></svg>;
     case "plus":     return <svg {...p}><path d="M12 5v14M5 12h14"/></svg>;
     case "menu":     return <svg {...p}><path d="M4 7h16M4 12h16M4 17h16"/></svg>;

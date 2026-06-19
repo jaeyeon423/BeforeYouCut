@@ -7,6 +7,12 @@ import siteConfig from "@/site.config";
  */
 export default function BusinessFooter() {
   const { business, service } = siteConfig;
+  const customerCenter = [business.phone, business.email].filter(Boolean).join(" · ");
+  const privacyOfficer = [
+    business.privacyOfficer.name,
+    business.privacyOfficer.email ? `(${business.privacyOfficer.email})` : "",
+  ].filter(Boolean).join(" ");
+  const copyrightName = business.name || service.name;
 
   return (
     <footer style={styles.wrap}>
@@ -20,14 +26,11 @@ export default function BusinessFooter() {
         <Row label="상호" value={business.name} />
         <Row label="대표자" value={business.ceo} />
         <Row label="사업장 주소" value={business.address} />
-        <Row label="고객센터" value={`${business.phone} · ${business.email}`} />
+        <Row label="고객센터" value={customerCenter} />
         <Row label="사업자등록번호" value={business.businessRegNo} />
         <Row label="통신판매업 신고번호" value={business.mailOrderRegNo} />
         <Row label="호스팅 서버 소재지" value={business.hostingLocation} />
-        <Row
-          label="개인정보보호책임자"
-          value={`${business.privacyOfficer.name} (${business.privacyOfficer.email})`}
-        />
+        <Row label="개인정보보호책임자" value={privacyOfficer} />
       </dl>
 
       <div style={styles.divider} />
@@ -43,13 +46,15 @@ export default function BusinessFooter() {
       </div>
 
       <div style={styles.copy}>
-        © {new Date().getFullYear()} {business.name}. All rights reserved.
+        © {new Date().getFullYear()} {copyrightName}. All rights reserved.
       </div>
     </footer>
   );
 }
 
 function Row({ label, value }) {
+  if (!value) return null;
+
   return (
     <div style={styles.row}>
       <dt style={styles.dt}>{label}</dt>

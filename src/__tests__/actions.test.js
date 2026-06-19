@@ -19,15 +19,35 @@ const mockPrisma = {
     create: vi.fn(),
     delete: vi.fn(),
   },
-  product: { update: vi.fn() },
-  user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-  seller: { create: vi.fn() },
+  product: { update: vi.fn(), create: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
+  order: { create: vi.fn(), update: vi.fn() },
+  payment: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  refundRequest: { findUnique: vi.fn(), update: vi.fn() },
+  settlement: { updateMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  csInquiry: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  csReply: { create: vi.fn() },
+  user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+  seller: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
 };
 vi.mock("../utils/prisma", () => ({ prisma: mockPrisma, default: mockPrisma }));
 
 // ── Import after mocks ─────────────────────────────────────────────────────
-const { toggleLike, toggleFollow, createSeller } = await import("../app/actions.js");
+const {
+  createInquiry,
+  createOrder,
+  prepareCheckout,
+  toggleLike,
+  toggleFollow,
+  createSeller,
+  createSellerProduct,
+  updateAdminInquiry,
+  updateAdminOrderStatus,
+  updateAdminProductReview,
+  updateAdminRefundStatus,
+  updateAdminSettlementStatus,
+} = await import("../app/actions.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const authedUser = (id = "user-1", email = "test@example.com") =>
@@ -86,6 +106,338 @@ describe("toggleLike", () => {
     mockGetUser.mockResolvedValue(authedUser());
     mockPrisma.like.findUnique.mockRejectedValue(new Error("DB connection failed"));
     await expect(toggleLike("product-1")).rejects.toThrow("DB connection failed");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// createInquiry
+// ══════════════════════════════════════════════════════════════════════════
+describe("createInquiry", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("미로그인 시 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+    await expect(createInquiry({ title: "상품 문의", content: "문의 내용입니다." }))
+      .rejects.toThrow("로그인이 필요합니다.");
+  });
+
+  it("상품 문의를 실제 CS 문의로 저장한다", async () => {
+    const createdAt = new Date("2026-06-19T00:00:00.000Z");
+    mockGetUser.mockResolvedValue(authedUser());
+    mockPrisma.product.findUnique.mockResolvedValue({
+      id: "product-1",
+      sellerId: "seller-1",
+      isActive: true,
+      deletedAt: null,
+      reviewStatus: "APPROVED",
+      seller: { isActive: true, deletedAt: null },
+    });
+    mockPrisma.seller.findUnique.mockResolvedValue({ id: "seller-1", isActive: true, deletedAt: null });
+    mockPrisma.csInquiry.create.mockResolvedValue({ id: "inquiry-1", status: "OPEN", createdAt });
+
+    const result = await createInquiry({
+      sellerId: "seller-1",
+      productId: "product-1",
+      title: "상품 문의",
+      content: "배송 일정이 궁금합니다.",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.csInquiry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "user-1",
+        sellerId: "seller-1",
+        productId: "product-1",
+        type: "INQUIRY",
+        title: "상품 문의",
+        content: "배송 일정이 궁금합니다.",
+      }),
+    });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// prepareCheckout / createOrder
+// ══════════════════════════════════════════════════════════════════════════
+describe("checkout payment flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY = "test_ck_checkout";
+  });
+
+  it("직접 주문 생성은 결제 승인 전에는 막는다", async () => {
+    mockGetUser.mockResolvedValue(authedUser());
+    await expect(createOrder()).rejects.toThrow("주문은 PG 결제 승인 후에만 생성할 수 있습니다.");
+  });
+
+  it("결제 준비 시 서버 가격 기준으로 Payment 세션을 생성한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        id: "product-1",
+        name: "프로 가위",
+        price: 30000,
+        sellerId: "seller-1",
+        icon: "scissors",
+        tone: "tone-a",
+        images: [],
+        seller: { id: "seller-1", name: "셀러" },
+      },
+    ]);
+    mockPrisma.payment.create.mockResolvedValue({ id: "payment-1" });
+
+    const result = await prepareCheckout({
+      name: "구매자",
+      phone: "01012345678",
+      address: "서울시 강남구",
+      total: 30000,
+      items: [{ id: "product-1", quantity: 1 }],
+      origin: "http://localhost:3000",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.clientKey).toBe("test_ck_checkout");
+    expect(result.amount).toBe(30000);
+    expect(mockPrisma.payment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        provider: "TOSS",
+        status: "READY",
+        amount: 30000,
+        buyerName: "구매자",
+        userId: "user-1",
+      }),
+    });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// updateAdminProductReview
+// ══════════════════════════════════════════════════════════════════════════
+describe("updateAdminProductReview", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$transaction.mockReset();
+  });
+
+  it("미로그인 시 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+    await expect(updateAdminProductReview({ productId: "product-1", reviewStatus: "APPROVED" }))
+      .rejects.toThrow("로그인이 필요합니다.");
+  });
+
+  it("관리자가 아니면 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(authedUser());
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user-1", role: "SELLER", email: "seller@example.com" });
+
+    await expect(updateAdminProductReview({ productId: "product-1", reviewStatus: "APPROVED" }))
+      .rejects.toThrow("관리자 권한이 필요합니다.");
+  });
+
+  it("관리자는 상품 검수 상태를 변경하고 감사 로그를 남긴다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("admin-1", "admin@example.com"));
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "admin-1", role: "ADMIN", email: "admin@example.com" });
+    mockPrisma.product.findUnique.mockResolvedValue({ sellerId: "seller-1" });
+    mockPrisma.product.update.mockResolvedValue({
+      id: "product-1",
+      sellerId: "seller-1",
+      name: "검수 상품",
+      price: 10000,
+      cat: "가위",
+      icon: "scissors",
+      tone: "tone-a",
+      badge: null,
+      disc: null,
+      orig: null,
+      rating: 4.8,
+      reviews: 0,
+      likesCount: 0,
+      images: ["/product-images/scissors.svg"],
+      spec: [],
+      desc: "검수 대상 상품",
+      isActive: true,
+      reviewStatus: "APPROVED",
+    });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+
+    const result = await updateAdminProductReview({ productId: "product-1", reviewStatus: "APPROVED", isActive: true });
+
+    expect(result.success).toBe(true);
+    expect(result.product.reviewStatus).toBe("APPROVED");
+    expect(mockPrisma.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "product-1" },
+        data: expect.objectContaining({
+          reviewStatus: "APPROVED",
+          isActive: true,
+          deletedAt: null,
+          reviewedBy: "admin-1",
+        }),
+      })
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "admin-1",
+          action: "ADMIN_UPDATE_PRODUCT_REVIEW",
+          targetTable: "Product",
+          targetId: "product-1",
+        }),
+      })
+    );
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// updateAdminOrderStatus / updateAdminSettlementStatus
+// ══════════════════════════════════════════════════════════════════════════
+describe("admin settlement operations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$transaction.mockReset();
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+    mockGetUser.mockResolvedValue(authedUser("admin-1", "admin@example.com"));
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "admin-1", role: "ADMIN", email: "admin@example.com" });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+  });
+
+  it("주문을 구매확정으로 바꾸면 대기 정산을 지급 대기로 확정한다", async () => {
+    mockPrisma.order.update.mockResolvedValue({ id: "order-1", status: "구매확정", items: [{ id: "item-1" }] });
+    mockPrisma.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await updateAdminOrderStatus({ orderId: "order-1", status: "구매확정" });
+
+    expect(result).toEqual({
+      success: true,
+      order: { id: "order-1", status: "구매확정" },
+      settlementsUpdated: 1,
+    });
+    expect(mockPrisma.settlement.updateMany).toHaveBeenCalledWith({
+      where: { orderItemId: { in: ["item-1"] }, status: "PENDING" },
+      data: { status: "CONFIRMED", settledAt: null },
+    });
+  });
+
+  it("주문을 환불완료로 바꾸면 미지급 정산을 제외 처리한다", async () => {
+    mockPrisma.order.update.mockResolvedValue({ id: "order-1", status: "환불완료", items: [{ id: "item-1" }] });
+    mockPrisma.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    await updateAdminOrderStatus({ orderId: "order-1", status: "환불완료" });
+
+    expect(mockPrisma.settlement.updateMany).toHaveBeenCalledWith({
+      where: { orderItemId: { in: ["item-1"] }, status: { in: ["PENDING", "CONFIRMED"] } },
+      data: { status: "CANCELED", settledAt: null },
+    });
+  });
+
+  it("확정된 정산은 지급 완료 처리하고 감사 로그를 남긴다", async () => {
+    const paidAt = new Date("2026-06-19T00:00:00.000Z");
+    mockPrisma.settlement.findUnique.mockResolvedValue({
+      id: "settlement-1",
+      status: "CONFIRMED",
+      settledAt: null,
+      orderItem: { order: { id: "order-1", status: "구매확정" } },
+    });
+    mockPrisma.settlement.update.mockResolvedValue({ id: "settlement-1", status: "PAID", settledAt: paidAt });
+
+    const result = await updateAdminSettlementStatus({ settlementId: "settlement-1", status: "PAID" });
+
+    expect(result.success).toBe(true);
+    expect(result.settlement.status).toBe("PAID");
+    expect(mockPrisma.settlement.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "settlement-1" },
+        data: expect.objectContaining({ status: "PAID", settledAt: expect.any(Date) }),
+      })
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "admin-1",
+          action: "ADMIN_UPDATE_SETTLEMENT_STATUS",
+          targetTable: "Settlement",
+          targetId: "settlement-1",
+        }),
+      })
+    );
+  });
+
+  it("구매확정 전 정산은 바로 지급 완료 처리할 수 없다", async () => {
+    mockPrisma.settlement.findUnique.mockResolvedValue({
+      id: "settlement-1",
+      status: "PENDING",
+      settledAt: null,
+      orderItem: { order: { id: "order-1", status: "배송중" } },
+    });
+
+    await expect(updateAdminSettlementStatus({ settlementId: "settlement-1", status: "PAID" }))
+      .rejects.toThrow("구매확정으로 확정된 정산만 지급 완료 처리할 수 있습니다.");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// admin refund / inquiry operations
+// ══════════════════════════════════════════════════════════════════════════
+describe("admin support operations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$transaction.mockReset();
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+    mockGetUser.mockResolvedValue(authedUser("admin-1", "admin@example.com"));
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "admin-1", role: "ADMIN", email: "admin@example.com" });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+  });
+
+  it("환불 완료 처리 시 주문을 환불완료로 바꾸고 미지급 정산을 제외한다", async () => {
+    const resolvedAt = new Date("2026-06-19T00:00:00.000Z");
+    mockPrisma.refundRequest.findUnique.mockResolvedValue({
+      id: "refund-1",
+      status: "APPROVED",
+      refundAmount: null,
+      order: { id: "order-1", status: "반품", total: 30000, items: [{ id: "item-1" }] },
+    });
+    mockPrisma.refundRequest.update.mockResolvedValue({
+      id: "refund-1",
+      status: "COMPLETED",
+      refundAmount: 30000,
+      resolvedAt,
+    });
+    mockPrisma.order.update.mockResolvedValue({});
+    mockPrisma.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await updateAdminRefundStatus({ refundId: "refund-1", status: "COMPLETED" });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.order.update).toHaveBeenCalledWith({
+      where: { id: "order-1" },
+      data: { status: "환불완료" },
+    });
+    expect(mockPrisma.settlement.updateMany).toHaveBeenCalledWith({
+      where: { orderItemId: { in: ["item-1"] }, status: { in: ["PENDING", "CONFIRMED"] } },
+      data: { status: "CANCELED", settledAt: null },
+    });
+  });
+
+  it("문의 답변을 저장하고 상태를 종료한다", async () => {
+    const closedAt = new Date("2026-06-19T00:00:00.000Z");
+    mockPrisma.csInquiry.findUnique.mockResolvedValue({ id: "inquiry-1", status: "OPEN" });
+    mockPrisma.csReply.create.mockResolvedValue({});
+    mockPrisma.csInquiry.update.mockResolvedValue({ id: "inquiry-1", status: "CLOSED", closedAt });
+
+    const result = await updateAdminInquiry({ inquiryId: "inquiry-1", status: "CLOSED", reply: "확인 후 처리했습니다." });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.csReply.create).toHaveBeenCalledWith({
+      data: {
+        inquiryId: "inquiry-1",
+        responderId: "admin-1",
+        content: "확인 후 처리했습니다.",
+      },
+    });
+    expect(mockPrisma.csInquiry.update).toHaveBeenCalledWith({
+      where: { id: "inquiry-1" },
+      data: expect.objectContaining({ status: "CLOSED", closedAt: expect.any(Date) }),
+    });
   });
 });
 
@@ -176,16 +528,16 @@ describe("createSeller — 입력 검증", () => {
     mockGetUser.mockResolvedValue(authedUser());
     await expect(createSeller({
       sellerId: "validid", name: "브랜드", category: "도구",
-      firstProduct: { name: "", price: 10000 },
-    })).rejects.toThrow("첫 상품명은 필수 입력 항목입니다.");
+      firstProduct: { name: "", price: 10000, desc: "설명", material: "스틸", origin: "대한민국", size: "6인치", care: "건조 보관", kcStatus: "해당 없음" },
+    })).rejects.toThrow("상품명은 필수입니다.");
   });
 
   it("firstProduct.price 가 0 이하면 에러를 던진다", async () => {
     mockGetUser.mockResolvedValue(authedUser());
     await expect(createSeller({
       sellerId: "validid", name: "브랜드", category: "도구",
-      firstProduct: { name: "상품명", price: 0 },
-    })).rejects.toThrow("올바르지 않은 상품 가격이 포함되어 있습니다.");
+      firstProduct: { name: "상품명", price: 0, desc: "설명", material: "스틸", origin: "대한민국", size: "6인치", care: "건조 보관", kcStatus: "해당 없음" },
+    })).rejects.toThrow("가격은 0보다 커야 합니다.");
   });
 });
 
@@ -222,6 +574,92 @@ describe("createSeller — 성공 케이스", () => {
     await createSeller(validInput);
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { role: "SELLER" } })
+    );
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// createSellerProduct
+// ══════════════════════════════════════════════════════════════════════════
+describe("createSellerProduct", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$transaction.mockReset();
+  });
+
+  const validInput = {
+    name: "테스트 커팅 시저",
+    category: "가위",
+    price: 129000,
+    desc: "현장 테스트용 커팅 시저입니다.",
+    material: "440C 스테인리스",
+    origin: "대한민국",
+    size: "6.0 inch",
+    care: "사용 후 마른 천으로 닦아 보관하세요.",
+    kcStatus: "해당 없음",
+  };
+
+  it("미로그인 시 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+    await expect(createSellerProduct(validInput)).rejects.toThrow("로그인이 필요합니다.");
+  });
+
+  it("판매자 계정이 없으면 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(authedUser());
+    mockPrisma.seller.findUnique.mockResolvedValue(null);
+    await expect(createSellerProduct(validInput)).rejects.toThrow("판매자 계정이 없습니다.");
+  });
+
+  it("필수 상품 정보가 없으면 에러를 던진다", async () => {
+    mockGetUser.mockResolvedValue(authedUser());
+    mockPrisma.seller.findUnique.mockResolvedValue({ id: "seller-1", name: "셀러", tone: "tone-a" });
+    await expect(createSellerProduct({ ...validInput, material: "" })).rejects.toThrow("소재는 필수입니다.");
+  });
+
+  it("로그인 판매자의 상품을 생성하고 상품 수를 갱신한다", async () => {
+    const inputWithImage = { ...validInput, imageUrl: "/product-images/scissors.svg" };
+    mockGetUser.mockResolvedValue(authedUser());
+    mockPrisma.seller.findUnique.mockResolvedValue({ id: "seller-1", name: "셀러", tone: "tone-b" });
+    mockPrisma.product.create.mockResolvedValue({
+      id: "product-1",
+      sellerId: "seller-1",
+      name: validInput.name,
+      price: validInput.price,
+      cat: validInput.category,
+      icon: "scissors",
+      tone: "tone-b",
+      badge: "new",
+      disc: null,
+      orig: null,
+      rating: 4.8,
+      reviews: 0,
+      likesCount: 0,
+      images: [inputWithImage.imageUrl],
+      spec: [],
+      desc: validInput.desc,
+    });
+    mockPrisma.product.count.mockResolvedValue(3);
+    mockPrisma.seller.update.mockResolvedValue({});
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+
+    const result = await createSellerProduct(inputWithImage);
+
+    expect(result.success).toBe(true);
+    expect(result.product.images).toEqual([inputWithImage.imageUrl]);
+    expect(mockPrisma.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sellerId: "seller-1",
+          name: validInput.name,
+          cat: validInput.category,
+          icon: "scissors",
+          badge: "new",
+          images: [inputWithImage.imageUrl],
+        }),
+      })
+    );
+    expect(mockPrisma.seller.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { productsCount: 3 } })
     );
   });
 });

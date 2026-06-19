@@ -1,5 +1,5 @@
 /* ============================================================
-   BEFORE YOU CUT — 미용인 브랜딩 마켓플레이스
+   MIYONGSA — 미용인 전문 도구 마켓플레이스
    Monochrome / minimal design system
    ============================================================ */
 
@@ -235,6 +235,11 @@ a, .pcard, .rankrow, .brandcell {
   position: absolute; top: 9px; left: 9px;
   font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
   color: rgba(17,17,17,0.4); text-transform: uppercase;
+}
+.product-img {
+  width: 100%; height: 100%;
+  display: block; object-fit: cover;
+  background: var(--surface);
 }
 
 /* ============================================================

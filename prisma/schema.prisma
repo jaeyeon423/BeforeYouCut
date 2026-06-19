@@ -20,6 +20,7 @@ model User {
 
   seller    Seller?
   orders    Order[]
+  payments  Payment[]
   likes     Like[]
   follows   Follow[]
   consents  ConsentRecord[]
@@ -47,6 +48,16 @@ model Seller {
   businessRegNo   String? // 사업자등록번호 (앱 레이어에서 AES-256 암호화 저장)
   businessName    String? // 사업자 상호 (사업자인 경우)
   representative  String? // 대표자명 (사업자인 경우)
+  businessDocumentUrl String? // 사업자등록증 등 KYC 증빙 URL
+  mailOrderDocumentUrl String? // 통신판매업 신고증 URL
+  businessDocumentPath String? // seller-documents 비공개 버킷 경로
+  mailOrderDocumentPath String? // seller-documents 비공개 버킷 경로
+  // DRAFT | SUBMITTED | APPROVED | REJECTED
+  kycStatus      String    @default("DRAFT")
+  kycMemo        String?   @db.Text
+  kycSubmittedAt DateTime?
+  kycReviewedAt  DateTime?
+  kycReviewedBy  String?
 
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -58,6 +69,7 @@ model Seller {
   inquiries       CsInquiry[]
 
   @@index([sellerType])
+  @@index([kycStatus])
 }
 
 model Product {
@@ -74,7 +86,13 @@ model Product {
   reviews     Int      @default(0)
   likesCount  Int      @default(0)
   desc        String
+  images      Json     @default("[]")
   spec        Json     @default("[]")
+  isActive    Boolean  @default(true)
+  reviewStatus String  @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  deletedAt   DateTime?
 
   sellerId    String
   seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
@@ -85,6 +103,8 @@ model Product {
   @@index([sellerId])
   @@index([cat])
   @@index([badge])
+  @@index([isActive])
+  @@index([reviewStatus])
 }
 
 model Order {
@@ -103,6 +123,7 @@ model Order {
   archivedAt  DateTime? // 법정 보존 기간 후 아카이브 처리 시각
 
   items         OrderItem[]
+  payment       Payment?
   refundRequest RefundRequest?
   shipment      ShipmentTracking?
 
@@ -125,6 +146,39 @@ model OrderItem {
   settlement Settlement?
 
   @@index([orderId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 결제 인증 세션 / PG 승인 기록
+// ──────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id              String   @id @default(uuid())
+  provider        String   @default("TOSS")
+  providerOrderId String   @unique
+  paymentKey      String?  @unique
+  status          String   @default("READY") // READY | PAID | FAILED | CANCELED
+  amount          Int
+  orderName       String
+  buyerName       String
+  buyerPhone      String?
+  shippingAddress String
+  itemsSnapshot   Json
+  requestedAt     DateTime @default(now())
+  approvedAt      DateTime?
+  failedAt        DateTime?
+  failureCode     String?
+  failureMessage  String?
+  rawResponse     Json?
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId         String?  @unique
+  order           Order?   @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([requestedAt])
 }
 
 model Like {
@@ -229,7 +283,7 @@ model Settlement {
   commissionAmount Int       // 수수료액
   netAmount        Int       // 정산액 = saleAmount - commissionAmount
 
-  // PENDING: 구매확정 대기 | CONFIRMED: 구매확정 | PAID: 정산 완료
+  // PENDING: 구매확정 대기 | CONFIRMED: 지급 대기 | PAID: 정산 완료 | CANCELED: 취소/환불 제외
   status           String    @default("PENDING")
   settledAt        DateTime?
   createdAt        DateTime  @default(now())

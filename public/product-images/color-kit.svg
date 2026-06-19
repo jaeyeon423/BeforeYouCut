@@ -1,0 +1,18 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1200" fill="#f0efea"/>
+  <rect x="110" y="110" width="980" height="980" rx="54" fill="#fbfaf7"/>
+  <ellipse cx="600" cy="908" rx="390" ry="55" fill="#d6d2c9"/>
+  <rect x="305" y="355" width="168" height="480" rx="36" fill="#222" stroke="#111" stroke-width="16"/>
+  <rect x="516" y="300" width="168" height="535" rx="36" fill="#e9e5d8" stroke="#111" stroke-width="16"/>
+  <rect x="727" y="355" width="168" height="480" rx="36" fill="#b9a58d" stroke="#111" stroke-width="16"/>
+  <rect x="334" y="474" width="110" height="190" rx="18" fill="#f7f2df"/>
+  <rect x="545" y="422" width="110" height="216" rx="18" fill="#2b2b2b"/>
+  <rect x="756" y="474" width="110" height="190" rx="18" fill="#fbfaf7"/>
+  <rect x="335" y="284" width="108" height="86" rx="18" fill="#161616"/>
+  <rect x="545" y="230" width="110" height="86" rx="18" fill="#161616"/>
+  <rect x="757" y="284" width="108" height="86" rx="18" fill="#161616"/>
+  <path d="M353 720H425M564 696H636M775 720H847" stroke="#fff" stroke-width="14" stroke-linecap="round" opacity=".7"/>
+  <circle cx="600" cy="530" r="44" fill="#c7a37b"/>
+  <circle cx="389" cy="570" r="36" fill="#9c7b60"/>
+  <circle cx="811" cy="570" r="36" fill="#45352f"/>
+</svg>

@@ -3,7 +3,7 @@ import siteConfig from "@/site.config";
 import TermsLayout from "../_TermsLayout";
 
 export const metadata = {
-  title: "개인정보처리방침 — BEFORE YOU CUT",
+  title: `개인정보처리방침 — ${siteConfig.service.name}`,
 };
 
 export default function PrivacyPolicyPage() {

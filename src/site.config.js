@@ -10,28 +10,29 @@
 const siteConfig = {
   // ── 사업자 정보 (전자상거래법·통신판매업 공시 의무) ──────────────────
   business: {
-    name:           "주식회사 OOO",                          // TODO(운영자 입력): 상호
-    ceo:            "홍길동",                                 // TODO(운영자 입력): 대표자명
-    address:        "서울특별시 OO구 OO로 00",               // TODO(운영자 입력): 사업장 주소
-    phone:          "02-0000-0000",                          // TODO(운영자 입력): 고객센터 전화번호
-    email:          "help@beforeyoucut.com",                 // TODO(운영자 입력): 고객센터 이메일
-    businessRegNo:  "000-00-00000",                          // TODO(운영자 입력): 사업자등록번호 (세무서 발급)
-    mailOrderRegNo: "제0000-서울OO-0000호",                  // TODO(운영자 입력): 통신판매업 신고번호 (관할 지자체 신고)
+    name:           "미용사",                                 // TODO(운영자 입력): 사업자등록증 상호와 다르면 실제 상호로 교체
+    ceo:            "",                                      // TODO(운영자 입력): 대표자명
+    address:        "",                                      // TODO(운영자 입력): 사업장 주소
+    phone:          "",                                      // TODO(운영자 입력): 고객센터 전화번호
+    email:          "help@miyongsa.kr",                      // TODO(운영자 입력): 실제 수신 가능한 고객센터 이메일로 교체
+    businessRegNo:  "",                                      // TODO(운영자 입력): 사업자등록번호
+    mailOrderRegNo: "",                                      // TODO(운영자 입력): 통신판매업 신고번호
     hostingLocation:"Amazon Web Services, 서울 리전 (ap-northeast-2)", // Supabase 인프라 기준 — 변경 시 업데이트
     privacyOfficer: {
-      name:  "홍길동",                                        // TODO(운영자 입력): 개인정보보호책임자 성명
-      email: "privacy@beforeyoucut.com",                    // TODO(운영자 입력): 개인정보보호책임자 이메일
+      name:  "",                                             // TODO(운영자 입력): 개인정보보호책임자 성명
+      email: "privacy@miyongsa.kr",                         // TODO(운영자 입력): 실제 수신 가능한 개인정보 문의 이메일로 교체
     },
   },
 
   // ── 서비스 메타 ────────────────────────────────────────────────────
   service: {
-    name:        "BEFORE YOU CUT",
-    url:         "https://beforeyoucut.com",                 // TODO(운영자 입력): 실서비스 도메인
-    description: "미용인을 위한 브랜드 마켓플레이스",
+    name:        "미용사",
+    englishName: "MIYONGSA",
+    url:         "https://miyongsa.kr",                      // TODO(운영자 입력): 실서비스 도메인 확정 후 교체
+    description: "미용인을 위한 전문 도구 마켓플레이스",
     // 전자상거래법 제20조 — 통신판매중개자 고지 의무
     intermediaryNotice:
-      "BEFORE YOU CUT는 통신판매중개자로서 통신판매의 당사자가 아닙니다. " +
+      "미용사는 통신판매중개자로서 통신판매의 당사자가 아닙니다. " +
       "상품 주문·배송·환불 등 거래의 당사자는 각 판매자(입점 셀러)이며, " +
       "플랫폼은 해당 거래에 관한 의무와 책임을 부담하지 않습니다.",
   },

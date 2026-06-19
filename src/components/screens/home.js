@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Icon from '../icons';
 import {
   Placeholder,
+  ProductMedia,
   SectionHeader,
   ProductRail,
 } from '../ui';
@@ -14,7 +15,7 @@ import BusinessFooter from '../BusinessFooter';
 
 export function HomeHero({ seller, banner }) {
   if (!seller) {
-    const kicker = banner?.kicker || "BEFORE YOU CUT";
+    const kicker = banner?.kicker || "MIYONGSA";
     const title = banner?.title || "내 미용 브랜드를\n입점시켜보세요";
     const desc = banner?.desc || "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.";
     const ctaText = banner?.ctaText || "입점 신청하기";
@@ -54,7 +55,7 @@ export function PriorityToolList({ items }) {
       {items.map((p, i) => (
         <Link key={p.id} href={`/products/${p.id}`} className="rankrow" style={{ textDecoration: "none", color: "inherit" }}>
           <div className={"rank-num" + (i < 3 ? " top" : "")}>{i + 1}</div>
-          <div className="rank-media"><Placeholder icon={p.icon} tone={p.tone} size={28} /></div>
+          <div className="rank-media"><ProductMedia p={p} size={28} /></div>
           <div className="rank-body">
             <div className="rank-brand">{p.sellerName || p.seller}</div>
             <div className="rank-name">{p.name}</div>

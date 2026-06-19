@@ -39,6 +39,24 @@ async function main() {
   console.log("Cleaning database...");
 
   // Delete in reverse order of foreign key dependencies
+  const repliesDeleted = await prisma.csReply.deleteMany({});
+  console.log(`Deleted ${repliesDeleted.count} CS replies.`);
+
+  const inquiriesDeleted = await prisma.csInquiry.deleteMany({});
+  console.log(`Deleted ${inquiriesDeleted.count} CS inquiries.`);
+
+  const settlementsDeleted = await prisma.settlement.deleteMany({});
+  console.log(`Deleted ${settlementsDeleted.count} settlements.`);
+
+  const refundsDeleted = await prisma.refundRequest.deleteMany({});
+  console.log(`Deleted ${refundsDeleted.count} refund requests.`);
+
+  const shipmentsDeleted = await prisma.shipmentTracking.deleteMany({});
+  console.log(`Deleted ${shipmentsDeleted.count} shipment records.`);
+
+  const auditLogsDeleted = await prisma.auditLog.deleteMany({});
+  console.log(`Deleted ${auditLogsDeleted.count} audit logs.`);
+
   const orderItemsDeleted = await prisma.orderItem.deleteMany({});
   console.log(`Deleted ${orderItemsDeleted.count} order items.`);
 
@@ -54,31 +72,17 @@ async function main() {
   const productsDeleted = await prisma.product.deleteMany({});
   console.log(`Deleted ${productsDeleted.count} products.`);
 
+  const bankAccountsDeleted = await prisma.sellerBankAccount.deleteMany({});
+  console.log(`Deleted ${bankAccountsDeleted.count} seller bank accounts.`);
+
   const sellersDeleted = await prisma.seller.deleteMany({});
   console.log(`Deleted ${sellersDeleted.count} sellers.`);
 
-  // Delete all users EXCEPT the default guest user
-  const usersDeleted = await prisma.user.deleteMany({
-    where: {
-      NOT: {
-        id: "user_default"
-      }
-    }
-  });
-  console.log(`Deleted ${usersDeleted.count} users (except default guest user).`);
+  const consentsDeleted = await prisma.consentRecord.deleteMany({});
+  console.log(`Deleted ${consentsDeleted.count} consent records.`);
 
-  // Ensure default guest user exists for seamless out-of-the-box operations
-  await prisma.user.upsert({
-    where: { id: "user_default" },
-    update: {},
-    create: {
-      id: "user_default",
-      email: "guest@beforeyoucut.com",
-      name: "게스트 사용자",
-      role: "BUYER",
-    },
-  });
-  console.log("Verified default guest user exists.");
+  const usersDeleted = await prisma.user.deleteMany({});
+  console.log(`Deleted ${usersDeleted.count} users.`);
 
   console.log("Database cleaned successfully! Ready for real production data.");
 }

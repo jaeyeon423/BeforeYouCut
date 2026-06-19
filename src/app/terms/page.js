@@ -3,12 +3,12 @@ import siteConfig from "@/site.config";
 import TermsLayout from "./_TermsLayout";
 
 export const metadata = {
-  title: "이용약관 — BEFORE YOU CUT",
+  title: `이용약관 — ${siteConfig.service.name}`,
 };
 
 export default function UserTermsPage() {
   const { version, effectiveAt } = siteConfig.terms.userTerms;
-  const { business } = siteConfig;
+  const { business, service } = siteConfig;
 
   return (
     <>
@@ -17,7 +17,7 @@ export default function UserTermsPage() {
         {/* TODO(법무 검토): 아래 약관 초안은 법무 검토 전 초안입니다. 시행 전 반드시 법률 전문가 검토를 받으십시오. */}
 
         <Section title="제1조 (목적)">
-          이 약관은 {business.name}(이하 &quot;회사&quot;)이 운영하는 BEFORE YOU CUT 서비스(이하 &quot;서비스&quot;)의
+          이 약관은 {business.name}(이하 &quot;회사&quot;)이 운영하는 {service.name} 서비스(이하 &quot;서비스&quot;)의
           이용과 관련하여 회사와 이용자 간의 권리·의무 및 책임 사항을 규정함을 목적으로 합니다.
         </Section>
 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Icon from './icons';
 import { CAT_ICON, won } from '../data/data';
 import { useApp } from '@/contexts/app-context';
@@ -16,11 +17,30 @@ export function Placeholder({ icon = "scissors", tone = "tone-a", tag, size = 44
   );
 }
 
+export function ProductMedia({ p, image, size = 44, loading = "lazy" }) {
+  const src = image || (Array.isArray(p?.images) ? p.images.find(Boolean) : null);
+  if (src) {
+    return (
+      <Image
+        className="product-img"
+        src={src}
+        alt={p?.name || "상품 이미지"}
+        width={900}
+        height={900}
+        loading={loading}
+        unoptimized
+      />
+    );
+  }
+
+  return <Placeholder icon={p?.icon || "scissors"} tone={p?.tone || "tone-a"} size={size} />;
+}
+
 // ---------- brand wordmark ----------
 export function Wordmark() {
   return (
     <div className="wordmark">
-      <span>BEFORE YOU </span><span className="cut">CUT</span>
+      <span>MIYONG</span><span className="cut">SA</span>
     </div>
   );
 }
@@ -66,7 +86,7 @@ export function ProductCard({ p, variant = "meta" }) {
     return (
       <Link href={`/products/${p.id}`} className="pcard overlay">
         <div className="pcard-media">
-          <Placeholder icon={p.icon} tone={p.tone} />
+          <ProductMedia p={p} />
           {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
           <div className="ov">
             <div className="ov-brand">{seller.name}</div>
@@ -81,7 +101,7 @@ export function ProductCard({ p, variant = "meta" }) {
   return (
     <Link href={`/products/${p.id}`} className="pcard">
       <div className="pcard-media">
-        <Placeholder icon={p.icon} tone={p.tone} />
+        <ProductMedia p={p} />
         {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
         <span className="pcard-like" role="button" tabIndex={0} onClick={onLike} aria-label="찜">
           <Icon name="heart" size={20} fill={liked} stroke={1.8} />

@@ -1,4 +1,4 @@
-# BEFORE YOU CUT 오픈마켓 구축 체크리스트
+# 미용사 오픈마켓 구축 체크리스트
 
 원문 문서: `docs/hair-beauty-open-market-guide.docx`
 

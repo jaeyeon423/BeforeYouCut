@@ -1,4 +1,4 @@
-# BEFORE YOU CUT — 프로덕션 전환 작업 프롬프트
+# 미용사 — 프로덕션 전환 작업 프롬프트
 
 > 프로토타입 → 프로덕션 전환을 위한 단계별 실행 프롬프트.
 > 각 프롬프트는 프로젝트 디렉토리(`C:\Users\jaeye\wc\before_you_cut`)에서 바로 실행 가능하도록 작성됨.
@@ -9,7 +9,7 @@
 ## 1단계 프롬프트: 치명적 버그 수정
 
 ```
-# 1단계: BEFORE YOU CUT — 보안 및 치명적 버그 수정
+# 1단계: 미용사 — 보안 및 치명적 버그 수정
 
 ## 프로젝트 컨텍스트
 - Next.js 16 + React 19 / Supabase Auth / Prisma 7 + PostgreSQL / Vercel 배포
@@ -87,7 +87,7 @@ Server action의 userId 파라미터가 제거되었으므로:
 ## 2단계 프롬프트: 아키텍처 개선
 
 ```
-# 2단계: BEFORE YOU CUT — App Router 기반 라우팅 분리 및 데이터 페칭 최적화
+# 2단계: 미용사 — App Router 기반 라우팅 분리 및 데이터 페칭 최적화
 
 ## 프로젝트 컨텍스트
 - Next.js 16 + React 19 / Supabase Auth / Prisma 7 + PostgreSQL / Vercel 배포

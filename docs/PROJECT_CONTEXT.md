@@ -1,6 +1,6 @@
-# BEFORE YOU CUT Project Context
+# 미용사 Project Context
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 Purpose: give AI agents and developers the minimum project context needed to work without re-reading the whole repository. Read this first, then inspect only the task-relevant files.
 
@@ -15,13 +15,13 @@ Before writing Next.js code, read the relevant guide in `node_modules/next/dist/
 
 ## Product
 
-BEFORE YOU CUT is a mobile-first marketplace for hair and beauty professionals. Buyers browse premium tools and brands. Sellers manage brand onboarding, product detail composition, orders, and settlements inside the same web app.
+미용사 is a mobile-first marketplace for hair and beauty professionals. Buyers browse professional tools and brands. Sellers manage brand onboarding, product registration, product detail composition, orders, and settlements inside the same web app.
 
 Current role split:
 
 - Buyer surface: shopping, search, product detail, seller profile, cart, saved items, my page.
 - Seller surface: `/seller` seller center inside the same Next.js app.
-- Admin surface: not implemented yet. Add `/admin` later for seller review, legal checks, reports, and settlement operations.
+- Admin surface: `/admin` inside the same app for seller approval, product review, order status, refunds, settlement status handling, and CS overview.
 
 ## Stack
 
@@ -80,9 +80,12 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `/sellers`: seller/brand list.
 - `/sellers/[id]`: public seller profile.
 - `/cart`: cart/checkout flow.
+- `/checkout/success`, `/checkout/fail`: Toss Payments redirect handlers; success confirms payment server-side and creates the order.
+- `/orders/[id]`: private order detail for the buyer, order-owning seller, or admin; includes shipment registration and refund request surfaces.
 - `/saved`: saved products.
 - `/my`: buyer account page with seller center entry point.
 - `/seller`: seller center. Guest users see login guidance; non-seller users can start seller onboarding; sellers manage details/orders/settlements.
+- `/admin`: admin console. Requires `User.role === "ADMIN"` or server-only `ADMIN_EMAILS` bootstrap.
 - `/terms`, `/terms/privacy`, `/terms/refund`, `/terms/seller`: legal pages.
 
 ## Data Model Snapshot
@@ -91,7 +94,7 @@ Primary models:
 
 - `User`: Supabase Auth user mirror. `role` is `BUYER | SELLER | ADMIN`.
 - `Seller`: brand profile plus seller type/business fields. One seller per user via unique `userId`.
-- `Product`: seller-owned product. `spec` is JSON array used on detail pages.
+- `Product`: seller-owned product. `images` is a JSON array of public image URLs; `reviewStatus` controls admin review (`PENDING | APPROVED | REJECTED`); `isActive/deletedAt` control visibility; `spec` is JSON array used on detail pages.
 - Product detail body sections are also stored in `Product.spec` as reserved key/value rows such as `상세 소개`, `핵심 포인트`, `사용/관리 팁`, `배송 안내`, `교환/반품 안내`, and `구매 전 확인사항`. Use `src/utils/product-detail.js` to parse/build this structure instead of hand-parsing it.
 - `Order` and `OrderItem`: buyer orders and line items.
 - `Like` and `Follow`: user-product and user-seller joins.
@@ -136,15 +139,35 @@ Environment and secrets:
 - `/seller` is the seller center.
 - `/my` contains an entry point to `/seller`.
 - Sellers can edit buyer-facing product detail content from `src/components/screens/seller-dashboard.js`.
+- Sellers can add new products from `/seller`; product creation requires core purchase-facing fields instead of creating placeholder products.
 - Buyer-facing product detail pages render structured detail sections from `Product.spec`; sellers edit the same fields in `/seller`.
+- Product cards, rankings, cart/order thumbnails, and detail pages render `Product.images`; sellers can upload a file to the Supabase Storage `product-images` bucket or paste an image URL in `/seller`.
+- New seller-created products default to `PENDING` review and are hidden from public marketplace loaders until an admin approves them.
+- `/admin` now provides a first-pass operations console: seller verify/hide, KYC review, product approve/reject/hide, order status update, refund approve/reject/complete handling, settlement confirm/pay/exclude handling, and CS reply/close handling. Admin writes create `AuditLog` records.
+- Buyer-facing product and seller inquiry modals now create real `CsInquiry` rows instead of showing local-only placeholder success messages.
+- `/orders/[id]` now provides a shared private order detail page. Buyers can view shipment/refund state and request refunds; sellers/admins can register shipment tracking for authorized orders.
+- Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
+- Direct order creation is disabled; orders are created only after PG confirmation.
+- Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
+- Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.
+- Supabase client helpers no longer fall back to placeholder project credentials; missing public Supabase env vars fail explicitly.
+- `prisma/clear.js` no longer recreates the old `user_default` guest account and now clears operational tables such as settlements, refunds, shipments, CS, audit logs, and bank accounts.
+- Public buyer-facing loaders expose only active, non-deleted sellers and products owned by those sellers; inactive temporary seller accounts can still use `/seller` but are hidden from marketplace pages.
 - Home, seller profile, and my-page surfaces intentionally avoid Musinsa-scale fandom/ranking/review placeholders; prioritize specs, seller trust, shipping/returns, and purchase decisions.
-- Admin should become `/admin` later when seller approval, KYC/business verification, disputes, and settlement operations need operator workflows.
+- Public service name is now `미용사` with `MIYONGSA` as the wordmark style. Fake public business values must not be displayed; use `src/site.config.js` and hide unknown legal values until the user provides real ones.
+- `docs/launch-gap-review.md` tracks Musinsa benchmark gaps and the remaining launch implementation order.
+- Admin console lives at `/admin`; external PG refund execution, PG webhook hardening, bank payout automation, and carrier tracking automation still need follow-up implementation.
 - Latest pushed commit as of 2026-06-18: `5c3a7d8 판매자 센터와 출시 체크리스트 추가`.
 
 ## Known Gaps
 
-- Real payment/PG integration is not implemented.
-- Admin review and seller approval workflow is not implemented.
+- Toss Payments payment-window request and server-side confirmation flow is implemented; real Toss test/live keys, production webhook handling, and operational PG dashboard verification are still required.
+- Admin review and seller approval workflow has a first-pass `/admin` implementation with KYC status/private document review, but the Supabase storage policy SQL still needs to be applied and verified in production.
+- Admins can record refund approval/rejection/completion and CS replies, but actual PG refund API execution is not implemented.
+- Admins can record settlement confirmation/payment status, but actual bank transfer/API payout execution is not implemented.
+- Real carrier tracking API integration is not implemented; sellers/admins can manually register carrier and tracking numbers.
+- Supabase Storage bucket and RLS/public-read policy for `product-images` must be verified in production.
+- Supabase Storage private bucket and policies for `seller-documents` are documented in `prisma/rls.sql`; production application and verification are still required.
 - Business registration, mail-order registration, final service domain, legal effective dates, and customer support details still need real values in `src/site.config.js`.
 - Sentry DSN/source map token values are pending.
 - Production RLS and storage policies should be verified before launch.

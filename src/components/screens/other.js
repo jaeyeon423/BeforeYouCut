@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Icon from '../icons';
@@ -9,12 +9,14 @@ import { useApp } from '@/contexts/app-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import {
-  createOrder,
+  createInquiry,
   getCategoryProducts,
+  prepareCheckout,
   recordConsents,
 } from '@/app/actions';
 import {
   Placeholder,
+  ProductMedia,
   SectionHeader,
   ProductGrid,
   ProductRail,
@@ -24,11 +26,29 @@ import IntermediaryNotice from '../IntermediaryNotice';
 import {
   CATEGORIES,
   CAT_ICON,
-  POPULAR_KEYWORDS,
   won,
 } from '../../data/data';
 import { parseProductSpec, splitDetailLines } from '@/utils/product-detail';
 import { Foot } from './home';
+
+function loadTossPaymentsSdk(src) {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") return reject(new Error("브라우저에서만 결제를 진행할 수 있습니다."));
+    if (window.TossPayments) return resolve();
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", () => reject(new Error("결제창 SDK를 불러오지 못했습니다.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("결제창 SDK를 불러오지 못했습니다."));
+    document.head.appendChild(script);
+  });
+}
 
 // ============================================================
 // CATEGORY
@@ -127,20 +147,6 @@ export function SearchScreen({ products = [] }) {
 
       {!q && (
         <>
-          {POPULAR_KEYWORDS && POPULAR_KEYWORDS.length > 0 && (
-            <div className="search-section">
-              <h4>인기 검색어 <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>오후 3:00 기준</span></h4>
-              <div className="kwlist">
-                {POPULAR_KEYWORDS.map(([w, d], i) => (
-                  <div key={w} className="kwrow" onClick={() => setQ(w)}>
-                    <span className="kw-rank">{i + 1}</span>
-                    <span className="kw-text">{w}</span>
-                    <span className="kw-delta" style={d === "NEW" ? { color: "var(--accent)", fontWeight: 700 } : null}>{d}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="search-section">
             <h4>브랜드 바로가기</h4>
             <div className="chiprow" style={{ padding: "0 0 4px" }}>
@@ -178,6 +184,7 @@ export function DetailScreen({ product: p, seller, related = [] }) {
   const [dot, setDot] = useState(0);
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryText, setInquiryText] = useState("");
+  const [isInquiryPending, startInquiryTransition] = useTransition();
   const liked = likes.has(p.id);
   const { rows: specRows, details } = parseProductSpec(p.spec);
   const detailIntro = details.intro || p.desc || `${s.name}가 구성한 ${p.cat} 상품입니다. 상세 정보와 판매자 안내를 확인한 뒤 주문해 주세요.`;
@@ -192,27 +199,48 @@ export function DetailScreen({ product: p, seller, related = [] }) {
     "구매 전 확인사항과 판매자 정보를 한 화면에서 확인",
   ];
   const visibleHighlights = highlights.length > 0 ? highlights : fallbackHighlights;
-  const mediaCaptions = ["제품 전체", "사용 포인트", "구성 정보"];
+  const gallery = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+  const activeDot = gallery[dot] ? dot : 0;
+  const activeImage = gallery[activeDot] || null;
 
   const handleInquireSubmit = (e) => {
     e.preventDefault();
     if (!inquiryText.trim()) return;
-    showToast("문의가 셀러에게 전송되었습니다.");
-    setInquiryText("");
-    setInquireOpen(false);
+    startInquiryTransition(async () => {
+      try {
+        await createInquiry({
+          sellerId: s.id,
+          productId: p.id,
+          type: "INQUIRY",
+          title: `상품 문의: ${p.name}`,
+          content: inquiryText,
+        });
+        showToast("문의가 접수되었습니다.");
+        setInquiryText("");
+        setInquireOpen(false);
+      } catch (error) {
+        showToast(error.message || "문의 접수에 실패했습니다.");
+      }
+    });
   };
 
   return (
     <>
       <div className="byc-scroll">
         <div className="pd-media">
-          <Placeholder icon={p.icon} tone={p.tone} size={92} />
+          <ProductMedia p={p} image={activeImage} size={92} loading="eager" />
           {p.badge && <span className={"badge " + p.badge} style={{ top: 14, left: 14 }}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
           <div className="pd-media-caption">
-            <span>{mediaCaptions[dot]}</span>
+            <span>{gallery.length > 1 ? `${activeDot + 1} / ${gallery.length}` : "제품 이미지"}</span>
             <b>{p.name}</b>
           </div>
-          <div className="pd-dots">{[0, 1, 2].map((i) => <i key={i} className={i === dot ? "on" : ""} onClick={() => setDot(i)} />)}</div>
+          {gallery.length > 1 && (
+            <div className="pd-dots">
+              {gallery.map((image, i) => (
+                <i key={`${image}-${i}`} className={i === activeDot ? "on" : ""} onClick={() => setDot(i)} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="pd-body">
@@ -347,7 +375,7 @@ export function DetailScreen({ product: p, seller, related = [] }) {
             <textarea value={inquiryText} onChange={(e) => setInquiryText(e.target.value)}
               placeholder="문의 내용을 입력하세요 (배송, 상품 옵션 등)" required
               style={sheetTextarea} />
-            <button className="buy" type="submit" style={{ width: "100%" }}>문의 전송</button>
+            <button className="buy" type="submit" style={{ width: "100%" }} disabled={isInquiryPending}>{isInquiryPending ? "전송 중..." : "문의 전송"}</button>
           </form>
         </ModalSheet>
       )}
@@ -364,13 +392,26 @@ export function SellerScreen({ seller, products = [] }) {
   const [tab, setTab] = useState("상품");
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryText, setInquiryText] = useState("");
+  const [isInquiryPending, startInquiryTransition] = useTransition();
 
   const handleInquireSubmit = (e) => {
     e.preventDefault();
     if (!inquiryText.trim()) return;
-    showToast("셀러에게 문의 메세지가 전송되었습니다.");
-    setInquiryText("");
-    setInquireOpen(false);
+    startInquiryTransition(async () => {
+      try {
+        await createInquiry({
+          sellerId: s.id,
+          type: "INQUIRY",
+          title: `브랜드 문의: ${s.name}`,
+          content: inquiryText,
+        });
+        showToast("문의가 접수되었습니다.");
+        setInquiryText("");
+        setInquireOpen(false);
+      } catch (error) {
+        showToast(error.message || "문의 접수에 실패했습니다.");
+      }
+    });
   };
 
   return (
@@ -423,7 +464,7 @@ export function SellerScreen({ seller, products = [] }) {
             <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>셀러: {s.name}</div>
             <textarea value={inquiryText} onChange={(e) => setInquiryText(e.target.value)}
               placeholder="문의하실 내용을 작성해 주세요." required style={sheetTextarea} />
-            <button className="buy" type="submit" style={{ width: "100%" }}>문의 전송</button>
+            <button className="buy" type="submit" style={{ width: "100%" }} disabled={isInquiryPending}>{isInquiryPending ? "전송 중..." : "문의 전송"}</button>
           </form>
         </ModalSheet>
       )}
@@ -463,17 +504,15 @@ export function SavedScreen({ products = [] }) {
 // SHOPPING BAG & CHECKOUT
 // ============================================================
 export function CartScreen() {
-  const router = useRouter();
   const { sellers, showToast } = useApp();
   const { user } = useAuth();
-  const { cart: items, removeCart, clearCart } = useCart();
+  const { cart: items, removeCart } = useCart();
   const total = items.reduce((a, p) => a + p.price, 0);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [buyerName, setBuyerName] = useState("");
-  const [buyerPhone, setBuyerPhone] = useState("010-1234-5678");
+  const [buyerPhone, setBuyerPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
-  const [payMethod, setPayMethod] = useState("카드결제");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -486,18 +525,34 @@ export function CartScreen() {
 
     setLoading(true);
     try {
-      const res = await createOrder({
+      const checkout = await prepareCheckout({
         name: buyerName,
+        phone: buyerPhone,
         address: shippingAddress,
         total,
         items: items.map((p) => ({ id: p.id, name: p.name, price: p.price, seller: p.seller, icon: p.icon, tone: p.tone })),
+        origin: window.location.origin,
       });
-      if (res?.success) {
-        clearCart();
-        setCheckoutOpen(false);
-        showToast("주문 및 결제가 완료되었습니다!");
-        router.push("/my");
-      }
+      await loadTossPaymentsSdk(checkout.sdkUrl);
+      const tossPayments = window.TossPayments(checkout.clientKey);
+      const payment = tossPayments.payment({ customerKey: checkout.customerKey });
+      await payment.requestPayment({
+        method: "CARD",
+        amount: { currency: "KRW", value: checkout.amount },
+        orderId: checkout.providerOrderId,
+        orderName: checkout.orderName,
+        successUrl: checkout.successUrl,
+        failUrl: checkout.failUrl,
+        customerEmail: checkout.customerEmail,
+        customerName: checkout.customerName,
+        customerMobilePhone: checkout.customerMobilePhone,
+        card: {
+          useEscrow: false,
+          flowMode: "DEFAULT",
+          useCardPoint: false,
+          useAppCardOnly: false,
+        },
+      });
     } catch (err) {
       console.error(err);
       showToast(err.message || "결제 처리에 실패했습니다.");
@@ -514,7 +569,7 @@ export function CartScreen() {
           {items.length ? items.map((p, i) => (
             <div key={i} className="rankrow" style={{ borderBottom: "1px solid var(--line)" }}>
               <Link href={`/products/${p.id}`} style={{ display: "flex", gap: 14, flex: 1, minWidth: 0, alignItems: "center", textDecoration: "none", color: "inherit" }}>
-                <div className="rank-media"><Placeholder icon={p.icon} tone={p.tone} size={28} /></div>
+                <div className="rank-media"><ProductMedia p={p} size={28} /></div>
                 <div className="rank-body">
                   <div className="rank-brand">{sellers[p.seller]?.name || p.seller}</div>
                   <div className="rank-name">{p.name}</div>
@@ -557,16 +612,8 @@ export function CartScreen() {
             </div>
             <div>
               <label style={{ ...sheetLabel, marginBottom: 6, display: "block" }}>결제 수단</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {["카드결제", "토스페이", "카카오페이"].map((m) => (
-                  <button key={m} type="button" onClick={() => setPayMethod(m)} disabled={loading}
-                    style={{
-                      flex: 1, padding: "10px 0", fontSize: 12.5, fontWeight: 600,
-                      border: payMethod === m ? "1.5px solid var(--ink)" : "1px solid var(--line)",
-                      borderRadius: 6, background: payMethod === m ? "var(--ink)" : "#fff",
-                      color: payMethod === m ? "#fff" : "var(--ink-soft)", cursor: "pointer",
-                    }}>{m}</button>
-                ))}
+              <div style={{ border: "1px solid var(--line)", borderRadius: 6, padding: 10, fontSize: 12.5, color: "var(--ink-soft)", lineHeight: 1.5 }}>
+                카드 및 간편결제는 토스페이먼츠 결제창에서 선택합니다.
               </div>
             </div>
             <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 8 }}>
@@ -575,7 +622,7 @@ export function CartScreen() {
                 <span style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{won(total)}원</span>
               </div>
               <button className="buy" type="submit" style={{ width: "100%" }} disabled={loading}>
-                {loading ? "결제 진행 중..." : "결제하기"}
+                {loading ? "결제창 준비 중..." : "결제창 열기"}
               </button>
             </div>
           </form>
@@ -734,7 +781,9 @@ export function MyScreen({ orders = [] }) {
                 </div>
                 {ord.items.map((item, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
-                    <Placeholder icon={item.icon} tone={item.tone} size={20} />
+                    <div style={{ width: 34, height: 34, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+                      <ProductMedia p={item} size={20} />
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: "var(--muted)" }}>{sellers[item.seller]?.name || item.seller}</div>
                       <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
@@ -746,6 +795,13 @@ export function MyScreen({ orders = [] }) {
                   <span style={{ color: "var(--ink-soft)" }}>배송상태: <b>{ord.status}</b></span>
                   <span style={{ fontWeight: 800 }}>총 {won(ord.total)}원</span>
                 </div>
+                <Link
+                  href={`/orders/${ord.id}`}
+                  onClick={() => setHistoryOpen(false)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 12, fontSize: 12, fontWeight: 800, color: "var(--ink)", textDecoration: "none" }}
+                >
+                  주문 상세 보기 <Icon name="chev-r-sm" size={14} />
+                </Link>
               </div>
             )) : (
               <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>주문하신 내역이 없습니다.</div>

@@ -126,3 +126,88 @@ ALTER TABLE "Seller" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "seller_select_public" ON "Seller" FOR SELECT USING (true);
 CREATE POLICY "seller_write_server_only" ON "Seller"
   FOR ALL WITH CHECK (false);
+
+-- ── Supabase Storage 버킷/정책 ──────────────────────────────
+-- product-images: 공개 상품 이미지. seller-documents: 비공개 KYC/정산 서류.
+-- 아래 storage.* 정책은 Supabase SQL Editor에서 실행해야 한다.
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'product-images',
+  'product-images',
+  true,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE
+SET public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'seller-documents',
+  'seller-documents',
+  false,
+  10485760,
+  ARRAY['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE
+SET public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "product_images_public_read" ON storage.objects;
+CREATE POLICY "product_images_public_read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'product-images');
+
+DROP POLICY IF EXISTS "product_images_seller_write_own" ON storage.objects;
+CREATE POLICY "product_images_seller_write_own" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (
+    bucket_id = 'product-images'
+    AND EXISTS (
+      SELECT 1 FROM public."Seller"
+      WHERE "Seller".id = (storage.foldername(name))[1]
+        AND "Seller"."userId" = auth.uid()::text
+    )
+  );
+
+DROP POLICY IF EXISTS "seller_documents_select_own" ON storage.objects;
+CREATE POLICY "seller_documents_select_own" ON storage.objects
+  FOR SELECT TO authenticated USING (
+    bucket_id = 'seller-documents'
+    AND EXISTS (
+      SELECT 1 FROM public."Seller"
+      WHERE "Seller".id = (storage.foldername(name))[1]
+        AND "Seller"."userId" = auth.uid()::text
+    )
+  );
+
+DROP POLICY IF EXISTS "seller_documents_insert_own" ON storage.objects;
+CREATE POLICY "seller_documents_insert_own" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (
+    bucket_id = 'seller-documents'
+    AND EXISTS (
+      SELECT 1 FROM public."Seller"
+      WHERE "Seller".id = (storage.foldername(name))[1]
+        AND "Seller"."userId" = auth.uid()::text
+    )
+  );
+
+DROP POLICY IF EXISTS "seller_documents_update_own" ON storage.objects;
+CREATE POLICY "seller_documents_update_own" ON storage.objects
+  FOR UPDATE TO authenticated USING (
+    bucket_id = 'seller-documents'
+    AND EXISTS (
+      SELECT 1 FROM public."Seller"
+      WHERE "Seller".id = (storage.foldername(name))[1]
+        AND "Seller"."userId" = auth.uid()::text
+    )
+  ) WITH CHECK (
+    bucket_id = 'seller-documents'
+    AND EXISTS (
+      SELECT 1 FROM public."Seller"
+      WHERE "Seller".id = (storage.foldername(name))[1]
+        AND "Seller"."userId" = auth.uid()::text
+    )
+  );

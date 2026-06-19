@@ -13,6 +13,8 @@ function isOverlayRoute(pathname) {
   return (
     pathname.startsWith("/products/") ||
     pathname.startsWith("/sellers/") ||
+    pathname.startsWith("/orders/") ||
+    pathname.startsWith("/checkout/") ||
     pathname === "/cart"
   );
 }

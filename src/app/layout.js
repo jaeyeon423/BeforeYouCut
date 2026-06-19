@@ -3,10 +3,11 @@ import Providers from "@/components/providers";
 import AppShell from "@/components/app-shell";
 import { getSellersMap } from "@/app/actions";
 import { Analytics } from "@vercel/analytics/next";
+import siteConfig from "@/site.config";
 
 export const metadata = {
-  title: "BEFORE YOU CUT — 미용인 브랜딩 마켓",
-  description: "미용인을 위한 브랜드 마켓플레이스 · 입점 셀러 직접 판매",
+  title: `${siteConfig.service.name} — 미용인을 위한 전문 도구 마켓`,
+  description: `${siteConfig.service.name}는 미용인을 위한 전문 도구 마켓플레이스입니다.`,
 };
 
 export default async function RootLayout({ children }) {

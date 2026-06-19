@@ -189,6 +189,19 @@ const PRODUCTS = [
   }
 ];
 
+const CATEGORY_IMAGES = {
+  "가위": "/product-images/scissors.svg",
+  "클리퍼": "/product-images/clipper.svg",
+  "빗·브러시": "/product-images/comb-set.svg",
+  "앞치마·유니폼": "/product-images/apron.svg",
+  "소모품": "/product-images/color-kit.svg",
+  "핸드메이드": "/product-images/leather-case.svg",
+};
+
+function imagesForProduct(product) {
+  return [product.image || CATEGORY_IMAGES[product.cat] || "/product-images/scissors.svg"];
+}
+
 async function main() {
   console.log("Seeding started...");
 
@@ -202,7 +215,7 @@ async function main() {
       update: {},
       create: {
         id: userId,
-        email: `${id}@beforeyoucut.com`,
+        email: `${id}@miyongsa.kr`,
         name: sellerData.name,
         role: "SELLER",
       }
@@ -257,6 +270,12 @@ async function main() {
         reviews: product.reviews,
         likesCount: product.likesCount,
         desc: product.desc,
+        images: imagesForProduct(product),
+        reviewStatus: "APPROVED",
+        isActive: true,
+        reviewedAt: new Date(),
+        reviewedBy: "seed",
+        deletedAt: null,
         spec: product.spec,
         sellerId: product.sellerId,
       },
@@ -274,6 +293,12 @@ async function main() {
         reviews: product.reviews,
         likesCount: product.likesCount,
         desc: product.desc,
+        images: imagesForProduct(product),
+        reviewStatus: "APPROVED",
+        isActive: true,
+        reviewedAt: new Date(),
+        reviewedBy: "seed",
+        deletedAt: null,
         spec: product.spec,
         sellerId: product.sellerId,
       }
@@ -286,7 +311,7 @@ async function main() {
   await prisma.mainBanner.upsert({
     where: { id: "hero" },
     update: {
-      kicker: "BEFORE YOU CUT",
+      kicker: "MIYONGSA",
       title: "내 미용 브랜드를\n입점시켜보세요",
       desc: "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.",
       ctaText: "입점 신청하기",
@@ -296,7 +321,7 @@ async function main() {
     },
     create: {
       id: "hero",
-      kicker: "BEFORE YOU CUT",
+      kicker: "MIYONGSA",
       title: "내 미용 브랜드를\n입점시켜보세요",
       desc: "가위, 앞치마, 클리퍼 등 직접 제작한 도구를 판매할 셀러를 모십니다.",
       ctaText: "입점 신청하기",
