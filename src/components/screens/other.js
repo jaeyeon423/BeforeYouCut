@@ -1159,25 +1159,28 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
                     </button>
                   </div>
                   {authPhoneSent && !authPhoneVerified && (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        style={{ ...sheetInput, width: "100%" }}
-                        value={authPhoneCode}
-                        onChange={(e) => setAuthPhoneCode(e.target.value)}
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder="인증번호 6자리"
-                        disabled={authLoading || authPhoneLoading}
-                      />
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        onClick={handleVerifyPhoneCode}
-                        disabled={authLoading || authPhoneLoading}
-                        style={{ width: 98, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: authLoading || authPhoneLoading ? "default" : "pointer" }}
-                      >
-                        확인
-                      </button>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <label style={sheetLabel}>SMS 인증번호</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          style={{ ...sheetInput, width: "100%" }}
+                          value={authPhoneCode}
+                          onChange={(e) => setAuthPhoneCode(e.target.value)}
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="인증번호 6자리"
+                          disabled={authLoading || authPhoneLoading}
+                        />
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={handleVerifyPhoneCode}
+                          disabled={authLoading || authPhoneLoading}
+                          style={{ width: 98, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: authLoading || authPhoneLoading ? "default" : "pointer" }}
+                        >
+                          확인
+                        </button>
+                      </div>
                     </div>
                   )}
                   {authPhoneDebugCode && (
