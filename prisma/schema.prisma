@@ -14,10 +14,12 @@ model User {
   id        String    @id // Supabase auth.users.id (UUID)
   email     String    @unique
   name      String?
+  phone     String?
   role      String    @default("BUYER") // BUYER | SELLER | ADMIN
   defaultShippingName    String?
   defaultShippingPhone   String?
   defaultShippingAddress String? @db.Text
+  defaultShippingAddressDetail String?
   createdAt DateTime  @default(now())
   deletedAt DateTime? // soft delete — 개인정보보호법 파기 처리 시 사용
 

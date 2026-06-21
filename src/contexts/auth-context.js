@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
         try {
           await syncUser({
             name: activeUser.user_metadata?.name || activeUser.email?.split("@")[0],
+            phone: activeUser.user_metadata?.phone,
           });
         } catch (e) {
           console.error("syncUser failed:", e);

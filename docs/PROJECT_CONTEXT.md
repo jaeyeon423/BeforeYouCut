@@ -92,7 +92,7 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 
 Primary models:
 
-- `User`: Supabase Auth user mirror. `role` is `BUYER | SELLER | ADMIN`; default shipping fields are used to prefill buyer checkout.
+- `User`: Supabase Auth user mirror. `role` is `BUYER | SELLER | ADMIN`; `phone` plus default shipping fields are used to prefill buyer checkout, with `defaultShippingAddressDetail` storing unit/floor/detail address separately.
 - `Seller`: brand profile plus seller type/business fields. One seller per user via unique `userId`.
 - `Product`: seller-owned product. `images` is a JSON array of public image URLs; `reviewStatus` controls admin review (`PENDING | APPROVED | REJECTED`); `isActive/deletedAt` control visibility; `spec` is JSON array used on detail pages.
 - Product detail body sections are also stored in `Product.spec` as reserved key/value rows such as `상세 소개`, `핵심 포인트`, `사용/관리 팁`, `배송 안내`, `교환/반품 안내`, and `구매 전 확인사항`. Use `src/utils/product-detail.js` to parse/build this structure instead of hand-parsing it.
@@ -148,7 +148,8 @@ Environment and secrets:
 - `/orders/[id]` now provides a shared private order detail page. Buyers can view shipment/refund state and request refunds; sellers/admins can register shipment tracking for authorized orders.
 - Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
 - Product detail has a buyer-facing direct order flow: `replaceCart([product])` then `/cart?checkout=1`, where cart auto-opens checkout or sends guests to `/my?auth=signin&returnTo=/cart?checkout=1`.
-- Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget.
+- Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget, and unit/floor details are captured in a separate detail-address field before being composed into the final order address.
+- Signup collects buyer name and phone in Supabase Auth metadata; `AuthProvider` passes those values to `syncUser` so checkout orderer info can be prefilled.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.

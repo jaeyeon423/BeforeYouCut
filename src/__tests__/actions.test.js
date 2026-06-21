@@ -39,6 +39,7 @@ const {
   createOrder,
   getMyShippingProfile,
   prepareCheckout,
+  syncUser,
   toggleLike,
   toggleFollow,
   createSeller,
@@ -52,8 +53,8 @@ const {
 } = await import("../app/actions.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const authedUser = (id = "user-1", email = "test@example.com") =>
-  ({ data: { user: { id, email, user_metadata: {} } } });
+const authedUser = (id = "user-1", email = "test@example.com", user_metadata = {}) =>
+  ({ data: { user: { id, email, user_metadata } } });
 const noUser = () => ({ data: { user: null } });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -228,9 +229,11 @@ describe("shipping profile", () => {
     mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
     mockPrisma.user.findUnique.mockResolvedValue({
       name: "기존 이름",
+      phone: "01000000000",
       defaultShippingName: "수령인",
       defaultShippingPhone: "01012345678",
       defaultShippingAddress: "서울시 강남구",
+      defaultShippingAddressDetail: "101동 202호",
     });
 
     const result = await getMyShippingProfile();
@@ -239,15 +242,39 @@ describe("shipping profile", () => {
       name: "수령인",
       phone: "01012345678",
       address: "서울시 강남구",
+      addressDetail: "101동 202호",
     });
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
       select: {
         name: true,
+        phone: true,
         defaultShippingName: true,
         defaultShippingPhone: true,
         defaultShippingAddress: true,
+        defaultShippingAddressDetail: true,
       },
+    });
+  });
+
+  it("저장된 수령인 정보가 없으면 회원 이름과 연락처를 기본값으로 사용한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com", { name: "가입자", phone: "01099998888" }));
+    mockPrisma.user.findUnique.mockResolvedValue({
+      name: "가입자",
+      phone: "01099998888",
+      defaultShippingName: null,
+      defaultShippingPhone: null,
+      defaultShippingAddress: null,
+      defaultShippingAddressDetail: null,
+    });
+
+    const result = await getMyShippingProfile();
+
+    expect(result).toEqual({
+      name: "가입자",
+      phone: "01099998888",
+      address: "",
+      addressDetail: "",
     });
   });
 
@@ -255,15 +282,18 @@ describe("shipping profile", () => {
     mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
     mockPrisma.user.upsert.mockResolvedValue({
       name: "구매자",
+      phone: "01012345678",
       defaultShippingName: "구매자",
       defaultShippingPhone: "01012345678",
       defaultShippingAddress: "서울시 강남구",
+      defaultShippingAddressDetail: "101동 202호",
     });
 
     const result = await updateMyShippingProfile({
       name: "구매자",
       phone: "01012345678",
       address: "서울시 강남구",
+      addressDetail: "101동 202호",
     });
 
     expect(result).toEqual({
@@ -272,6 +302,7 @@ describe("shipping profile", () => {
         name: "구매자",
         phone: "01012345678",
         address: "서울시 강남구",
+        addressDetail: "101동 202호",
       },
     });
     expect(mockPrisma.user.upsert).toHaveBeenCalledWith(
@@ -281,10 +312,12 @@ describe("shipping profile", () => {
           defaultShippingName: "구매자",
           defaultShippingPhone: "01012345678",
           defaultShippingAddress: "서울시 강남구",
+          defaultShippingAddressDetail: "101동 202호",
         },
         create: expect.objectContaining({
           id: "user-1",
           email: "buyer@example.com",
+          phone: "01012345678",
           role: "BUYER",
         }),
       })
@@ -298,7 +331,35 @@ describe("shipping profile", () => {
       name: "구매자",
       phone: "01012345678",
       address: "서울시 강남구",
+      addressDetail: "101동 202호",
     })).rejects.toThrow("로그인이 필요합니다.");
+  });
+});
+
+describe("syncUser", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("회원가입 메타데이터의 이름과 연락처를 User 테이블에 동기화한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
+    mockPrisma.user.upsert.mockResolvedValue({ id: "user-1", email: "buyer@example.com", name: "가입자", phone: "01099998888" });
+
+    const result = await syncUser({ name: "가입자", phone: "01099998888" });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      update: {
+        name: "가입자",
+        phone: "01099998888",
+      },
+      create: {
+        id: "user-1",
+        email: "buyer@example.com",
+        name: "가입자",
+        phone: "01099998888",
+        role: "BUYER",
+      },
+    });
   });
 });
 

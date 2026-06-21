@@ -120,11 +120,12 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
-function validateShippingProfileInput({ name, phone, address } = {}) {
+function validateShippingProfileInput({ name, phone, address, addressDetail } = {}) {
   const clean = {
     name: cleanText(name),
     phone: cleanText(phone),
     address: cleanText(address),
+    addressDetail: cleanText(addressDetail),
   };
 
   if (!clean.name) throw new Error("수령인 이름은 필수 입력 항목입니다.");
@@ -133,6 +134,7 @@ function validateShippingProfileInput({ name, phone, address } = {}) {
   if (clean.phone.length > 30) throw new Error("수령인 연락처는 30자 이하여야 합니다.");
   if (!clean.address) throw new Error("배송지 주소는 필수 입력 항목입니다.");
   if (clean.address.length > 300) throw new Error("배송지 주소는 300자 이하여야 합니다.");
+  if (clean.addressDetail.length > 100) throw new Error("상세주소는 100자 이하여야 합니다.");
 
   return clean;
 }
@@ -140,10 +142,12 @@ function validateShippingProfileInput({ name, phone, address } = {}) {
 function formatShippingProfile(user, authUser) {
   const fallbackEmailName = cleanText(authUser?.email).split("@")[0] || "";
   const fallbackName = cleanText(user?.name) || cleanText(authUser?.user_metadata?.name) || fallbackEmailName;
+  const fallbackPhone = cleanText(user?.phone) || cleanText(authUser?.user_metadata?.phone);
   return {
     name: cleanText(user?.defaultShippingName) || fallbackName,
-    phone: cleanText(user?.defaultShippingPhone),
+    phone: cleanText(user?.defaultShippingPhone) || fallbackPhone,
     address: cleanText(user?.defaultShippingAddress),
+    addressDetail: cleanText(user?.defaultShippingAddressDetail),
   };
 }
 
@@ -748,9 +752,11 @@ export async function getMyShippingProfile() {
       where: { id: authUser.id },
       select: {
         name: true,
+        phone: true,
         defaultShippingName: true,
         defaultShippingPhone: true,
         defaultShippingAddress: true,
+        defaultShippingAddressDetail: true,
       },
     });
 
@@ -775,21 +781,26 @@ export async function updateMyShippingProfile(input) {
         defaultShippingName: clean.name,
         defaultShippingPhone: clean.phone,
         defaultShippingAddress: clean.address,
+        defaultShippingAddressDetail: clean.addressDetail,
       },
       create: {
         id: authUser.id,
         email,
         name: clean.name,
+        phone: clean.phone,
         role: "BUYER",
         defaultShippingName: clean.name,
         defaultShippingPhone: clean.phone,
         defaultShippingAddress: clean.address,
+        defaultShippingAddressDetail: clean.addressDetail,
       },
       select: {
         name: true,
+        phone: true,
         defaultShippingName: true,
         defaultShippingPhone: true,
         defaultShippingAddress: true,
+        defaultShippingAddressDetail: true,
       },
     });
 
@@ -2330,16 +2341,22 @@ export async function updateSellerProductDetail({ productId, name, price, desc, 
 /**
  * Synchronize a Supabase Auth user record into the custom User table
  */
-export async function syncUser({ name } = {}) {
+export async function syncUser({ name, phone } = {}) {
   try {
     const authUser = await getAuthUser();
     if (!authUser) throw new Error("인증되지 않은 사용자입니다.");
     const id = authUser.id;
     const email = authUser.email;
+    const cleanName = cleanText(name);
+    const cleanPhone = cleanText(phone);
 
     const dataUpdate = {};
-    if (name) {
-      dataUpdate.name = name;
+    if (cleanName) {
+      dataUpdate.name = cleanName;
+    }
+    if (cleanPhone) {
+      if (cleanPhone.length > 30) throw new Error("연락처는 30자 이하여야 합니다.");
+      dataUpdate.phone = cleanPhone;
     }
 
     const user = await prisma.user.upsert({
@@ -2348,7 +2365,8 @@ export async function syncUser({ name } = {}) {
       create: {
         id,
         email,
-        name: name || email.split("@")[0],
+        name: cleanName || email.split("@")[0],
+        phone: cleanPhone || null,
         role: "BUYER",
       },
     });

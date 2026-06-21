@@ -103,6 +103,10 @@ async function openAddressSearch({ onSelect, onError }) {
   }
 }
 
+function composeShippingAddress(address, addressDetail) {
+  return [address, addressDetail].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+}
+
 // ============================================================
 // CATEGORY
 // ============================================================
@@ -580,6 +584,7 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [shippingAddressDetail, setShippingAddressDetail] = useState("");
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -588,6 +593,7 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
     setBuyerName((current) => current || shippingProfile.name || "");
     setBuyerPhone((current) => current || shippingProfile.phone || "");
     setShippingAddress((current) => current || shippingProfile.address || "");
+    setShippingAddressDetail((current) => current || shippingProfile.addressDetail || "");
   }, [shippingProfile]);
 
   useEffect(() => {
@@ -612,6 +618,7 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (!shippingAddress.trim()) { alert("배송지를 입력해 주세요."); return; }
+    const fullShippingAddress = composeShippingAddress(shippingAddress, shippingAddressDetail);
 
     setLoading(true);
     try {
@@ -620,12 +627,13 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
           name: buyerName,
           phone: buyerPhone,
           address: shippingAddress,
+          addressDetail: shippingAddressDetail,
         });
       }
       const checkout = await prepareCheckout({
         name: buyerName,
         phone: buyerPhone,
-        address: shippingAddress,
+        address: fullShippingAddress,
         total,
         items: items.map((p) => ({ id: p.id, name: p.name, price: p.price, seller: p.seller, icon: p.icon, tone: p.tone })),
         origin: window.location.origin,
@@ -721,6 +729,13 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
                   주소 찾기
                 </button>
               </div>
+              <input
+                style={{ ...sheetInput, width: "100%", marginTop: 8 }}
+                value={shippingAddressDetail}
+                onChange={(e) => setShippingAddressDetail(e.target.value)}
+                placeholder="상세주소 (동/호수, 층, 문 앞 요청 등)"
+                disabled={loading}
+              />
               {shippingProfile?.address && (
                 <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>기본 배송지를 불러왔습니다.</div>
               )}
@@ -767,12 +782,15 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [authOpen, setAuthOpen] = useState(null); // 'signin' | 'signup' | null
+  const [authName, setAuthName] = useState("");
+  const [authPhone, setAuthPhone] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [shippingName, setShippingName] = useState(shippingProfile?.name || "");
   const [shippingPhone, setShippingPhone] = useState(shippingProfile?.phone || "");
   const [shippingAddress, setShippingAddress] = useState(shippingProfile?.address || "");
+  const [shippingAddressDetail, setShippingAddressDetail] = useState(shippingProfile?.addressDetail || "");
   const [shippingSaving, setShippingSaving] = useState(false);
   // 회원가입 약관 동의 상태
   const [consentTerms, setConsentTerms] = useState(false);
@@ -789,6 +807,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
     setShippingName(shippingProfile.name || "");
     setShippingPhone(shippingProfile.phone || "");
     setShippingAddress(shippingProfile.address || "");
+    setShippingAddressDetail(shippingProfile.addressDetail || "");
   }, [shippingProfile]);
 
   const handleAuthSubmit = async (e) => {
@@ -799,13 +818,25 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
       alert("이용약관 및 개인정보처리방침에 모두 동의해 주세요.");
       return;
     }
+    if (authOpen === "signup" && (!authName.trim() || !authPhone.trim())) {
+      alert("이름과 연락처를 입력해 주세요.");
+      return;
+    }
+    if (authOpen === "signup" && authName.trim().length > 50) {
+      alert("이름은 50자 이하여야 합니다.");
+      return;
+    }
+    if (authOpen === "signup" && authPhone.trim().length > 30) {
+      alert("연락처는 30자 이하여야 합니다.");
+      return;
+    }
 
     setAuthLoading(true);
     if (authOpen === "signup") {
       const { error } = await supabase.auth.signUp({
         email: authEmail,
         password: authPassword,
-        options: { data: { name: authEmail.split("@")[0] } },
+        options: { data: { name: authName.trim(), phone: authPhone.trim() } },
       });
       setAuthLoading(false);
       if (error) { alert("회원가입 에러: " + error.message); }
@@ -815,6 +846,10 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
           consentedTypes: ["USER_TERMS", "PRIVACY_POLICY"],
         }).catch((e) => console.error("consent record failed:", e));
         showToast("회원가입이 완료되었습니다. 로그인해 주세요.");
+        setAuthName("");
+        setAuthPhone("");
+        setAuthEmail("");
+        setAuthPassword("");
         setConsentTerms(false);
         setConsentPrivacy(false);
         setAuthOpen("signin");
@@ -842,11 +877,13 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         name: shippingName,
         phone: shippingPhone,
         address: shippingAddress,
+        addressDetail: shippingAddressDetail,
       });
       if (result?.profile) {
         setShippingName(result.profile.name || "");
         setShippingPhone(result.profile.phone || "");
         setShippingAddress(result.profile.address || "");
+        setShippingAddressDetail(result.profile.addressDetail || "");
       }
       showToast("기본 배송지를 저장했습니다.");
       setSettingsOpen(false);
@@ -1008,6 +1045,13 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
                   주소 찾기
                 </button>
               </div>
+              <input
+                style={{ ...sheetInput, width: "100%", marginTop: 8 }}
+                value={shippingAddressDetail}
+                onChange={(e) => setShippingAddressDetail(e.target.value)}
+                placeholder="상세주소 (동/호수, 층, 문 앞 요청 등)"
+                disabled={shippingSaving}
+              />
             </div>
             <button className="buy" type="submit" style={{ width: "100%" }} disabled={shippingSaving}>
               {shippingSaving ? "저장 중..." : "기본 배송지 저장"}
@@ -1019,6 +1063,15 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
       {authOpen && (
         <ModalSheet title={authOpen === "signin" ? "로그인" : "회원가입"} onClose={() => !authLoading && setAuthOpen(null)}>
           <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {authOpen === "signup" && (
+              <div>
+                <label style={sheetLabel}>기본 정보</label>
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  <input style={sheetInput} value={authName} onChange={(e) => setAuthName(e.target.value)} required placeholder="이름" disabled={authLoading} />
+                  <input style={sheetInput} value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} required placeholder="연락처" disabled={authLoading} />
+                </div>
+              </div>
+            )}
             <div>
               <label style={sheetLabel}>이메일 주소</label>
               <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} required placeholder="email@example.com" disabled={authLoading} />
