@@ -37,6 +37,7 @@ vi.mock("../utils/prisma", () => ({ prisma: mockPrisma, default: mockPrisma }));
 const {
   createInquiry,
   createOrder,
+  getMyShippingProfile,
   prepareCheckout,
   toggleLike,
   toggleFollow,
@@ -47,6 +48,7 @@ const {
   updateAdminProductReview,
   updateAdminRefundStatus,
   updateAdminSettlementStatus,
+  updateMyShippingProfile,
 } = await import("../app/actions.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -207,6 +209,96 @@ describe("checkout payment flow", () => {
         userId: "user-1",
       }),
     });
+  });
+});
+
+describe("shipping profile", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("게스트는 기본 배송지를 반환하지 않는다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+
+    const result = await getMyShippingProfile();
+
+    expect(result).toBeNull();
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("로그인 사용자의 저장된 기본 배송지를 조회한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
+    mockPrisma.user.findUnique.mockResolvedValue({
+      name: "기존 이름",
+      defaultShippingName: "수령인",
+      defaultShippingPhone: "01012345678",
+      defaultShippingAddress: "서울시 강남구",
+    });
+
+    const result = await getMyShippingProfile();
+
+    expect(result).toEqual({
+      name: "수령인",
+      phone: "01012345678",
+      address: "서울시 강남구",
+    });
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      select: {
+        name: true,
+        defaultShippingName: true,
+        defaultShippingPhone: true,
+        defaultShippingAddress: true,
+      },
+    });
+  });
+
+  it("기본 배송지를 user upsert 로 저장한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("user-1", "buyer@example.com"));
+    mockPrisma.user.upsert.mockResolvedValue({
+      name: "구매자",
+      defaultShippingName: "구매자",
+      defaultShippingPhone: "01012345678",
+      defaultShippingAddress: "서울시 강남구",
+    });
+
+    const result = await updateMyShippingProfile({
+      name: "구매자",
+      phone: "01012345678",
+      address: "서울시 강남구",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      profile: {
+        name: "구매자",
+        phone: "01012345678",
+        address: "서울시 강남구",
+      },
+    });
+    expect(mockPrisma.user.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user-1" },
+        update: {
+          defaultShippingName: "구매자",
+          defaultShippingPhone: "01012345678",
+          defaultShippingAddress: "서울시 강남구",
+        },
+        create: expect.objectContaining({
+          id: "user-1",
+          email: "buyer@example.com",
+          role: "BUYER",
+        }),
+      })
+    );
+  });
+
+  it("기본 배송지 저장은 로그인이 필요하다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+
+    await expect(updateMyShippingProfile({
+      name: "구매자",
+      phone: "01012345678",
+      address: "서울시 강남구",
+    })).rejects.toThrow("로그인이 필요합니다.");
   });
 });
 

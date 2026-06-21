@@ -7,6 +7,7 @@ const CART_KEY = "byc_cart";
 const CartContext = createContext({
   cart: [],
   addCart: () => {},
+  replaceCart: () => {},
   removeCart: () => {},
   clearCart: () => {},
 });
@@ -33,11 +34,12 @@ export function CartProvider({ children }) {
   }, [cart, mounted]);
 
   const addCart = useCallback((p) => setCart((c) => [...c, p]), []);
+  const replaceCart = useCallback((items) => setCart(Array.isArray(items) ? items : []), []);
   const removeCart = useCallback((i) => setCart((c) => c.filter((_, k) => k !== i)), []);
   const clearCart = useCallback(() => setCart([]), []);
 
   return (
-    <CartContext.Provider value={{ cart, addCart, removeCart, clearCart }}>
+    <CartContext.Provider value={{ cart, addCart, replaceCart, removeCart, clearCart }}>
       {children}
     </CartContext.Provider>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useCallback, useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Icon from '../icons';
@@ -13,6 +13,7 @@ import {
   getCategoryProducts,
   prepareCheckout,
   recordConsents,
+  updateMyShippingProfile,
 } from '@/app/actions';
 import {
   Placeholder,
@@ -48,6 +49,58 @@ function loadTossPaymentsSdk(src) {
     script.onerror = () => reject(new Error("결제창 SDK를 불러오지 못했습니다."));
     document.head.appendChild(script);
   });
+}
+
+const KAKAO_POSTCODE_SDK_URL = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+
+function getPostcodeConstructor() {
+  if (typeof window === "undefined") return null;
+  return window.kakao?.Postcode || window.daum?.Postcode || null;
+}
+
+function loadPostcodeSdk() {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") return reject(new Error("브라우저에서만 주소 검색을 사용할 수 있습니다."));
+    if (getPostcodeConstructor()) return resolve();
+
+    const existing = document.querySelector(`script[src="${KAKAO_POSTCODE_SDK_URL}"]`);
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", () => reject(new Error("주소 검색 SDK를 불러오지 못했습니다.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = KAKAO_POSTCODE_SDK_URL;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("주소 검색 SDK를 불러오지 못했습니다."));
+    document.head.appendChild(script);
+  });
+}
+
+async function openAddressSearch({ onSelect, onError }) {
+  try {
+    await loadPostcodeSdk();
+    const Postcode = getPostcodeConstructor();
+    if (!Postcode) throw new Error("주소 검색 SDK를 사용할 수 없습니다.");
+
+    new Postcode({
+      oncomplete(data) {
+        const baseAddress = data.userSelectedType === "R" ? data.roadAddress : data.jibunAddress;
+        const extras = [];
+        if (data.userSelectedType === "R") {
+          if (data.bname && /[동로가]$/.test(data.bname)) extras.push(data.bname);
+          if (data.buildingName && data.apartment === "Y") extras.push(data.buildingName);
+        }
+        const extraAddress = extras.length ? ` (${extras.join(", ")})` : "";
+        const zonecode = data.zonecode ? `[${data.zonecode}] ` : "";
+        onSelect(`${zonecode}${baseAddress}${extraAddress}`.trim());
+      },
+    }).open();
+  } catch (error) {
+    onError?.(error.message || "주소 검색을 열지 못했습니다.");
+  }
 }
 
 // ============================================================
@@ -178,8 +231,9 @@ export function SearchScreen({ products = [] }) {
 // PRODUCT DETAIL
 // ============================================================
 export function DetailScreen({ product: p, seller, related = [] }) {
+  const router = useRouter();
   const { likes, toggleLike, showToast } = useApp();
-  const { addCart } = useCart();
+  const { addCart, replaceCart } = useCart();
   const s = seller || { id: p.seller, name: p.seller, category: "도구", followers: "0", products: 0, tone: "tone-a" };
   const [dot, setDot] = useState(0);
   const [inquireOpen, setInquireOpen] = useState(false);
@@ -202,6 +256,16 @@ export function DetailScreen({ product: p, seller, related = [] }) {
   const gallery = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
   const activeDot = gallery[dot] ? dot : 0;
   const activeImage = gallery[activeDot] || null;
+
+  const handleAddCart = () => {
+    addCart(p);
+    showToast("장바구니에 담았어요");
+  };
+
+  const handleDirectOrder = () => {
+    replaceCart([p]);
+    router.push("/cart?checkout=1");
+  };
 
   const handleInquireSubmit = (e) => {
     e.preventDefault();
@@ -365,7 +429,8 @@ export function DetailScreen({ product: p, seller, related = [] }) {
           <Icon name="heart" size={22} fill={liked} stroke={1.8} />
           <span>{((p.likes ?? 0) + (liked ? 1 : 0)).toLocaleString()}</span>
         </button>
-        <button className="buy" onClick={() => { addCart(p); showToast("장바구니에 담았어요"); }}>장바구니 담기</button>
+        <button className="buy buy-subtle" onClick={handleAddCart}>장바구니</button>
+        <button className="buy" onClick={handleDirectOrder}>바로 주문</button>
       </div>
 
       {inquireOpen && (
@@ -503,21 +568,46 @@ export function SavedScreen({ products = [] }) {
 // ============================================================
 // SHOPPING BAG & CHECKOUT
 // ============================================================
-export function CartScreen() {
+export function CartScreen({ initialCheckout = false, shippingProfile = null }) {
+  const router = useRouter();
   const { sellers, showToast } = useApp();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { cart: items, removeCart } = useCart();
   const total = items.reduce((a, p) => a + p.price, 0);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutIntentHandled, setCheckoutIntentHandled] = useState(false);
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.email) setBuyerName(user.email.split("@")[0]);
-  }, [user]);
+    if (!shippingProfile) return;
+    setBuyerName((current) => current || shippingProfile.name || "");
+    setBuyerPhone((current) => current || shippingProfile.phone || "");
+    setShippingAddress((current) => current || shippingProfile.address || "");
+  }, [shippingProfile]);
+
+  useEffect(() => {
+    if (!buyerName && user?.email) setBuyerName(user.email.split("@")[0]);
+  }, [buyerName, user]);
+
+  const goToLogin = useCallback(() => {
+    setCheckoutOpen(false);
+    router.push(`/my?auth=signin&returnTo=${encodeURIComponent("/cart?checkout=1")}`);
+  }, [router]);
+
+  useEffect(() => {
+    if (!initialCheckout || checkoutIntentHandled || !items.length || authLoading) return;
+    setCheckoutIntentHandled(true);
+    if (!user) {
+      goToLogin();
+      return;
+    }
+    setCheckoutOpen(true);
+  }, [authLoading, checkoutIntentHandled, goToLogin, initialCheckout, items.length, user]);
 
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
@@ -525,6 +615,13 @@ export function CartScreen() {
 
     setLoading(true);
     try {
+      if (saveAsDefault) {
+        await updateMyShippingProfile({
+          name: buyerName,
+          phone: buyerPhone,
+          address: shippingAddress,
+        });
+      }
       const checkout = await prepareCheckout({
         name: buyerName,
         phone: buyerPhone,
@@ -555,6 +652,10 @@ export function CartScreen() {
       });
     } catch (err) {
       console.error(err);
+      if (err?.message?.includes("로그인")) {
+        goToLogin();
+        return;
+      }
       showToast(err.message || "결제 처리에 실패했습니다.");
     } finally {
       setLoading(false);
@@ -590,7 +691,7 @@ export function CartScreen() {
       {items.length > 0 && (
         <div className="pd-buybar">
           <button className="buy" onClick={() => {
-            if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
+            if (!user) { goToLogin(); return; }
             setCheckoutOpen(true);
           }}>{won(total)}원 · 주문하기</button>
         </div>
@@ -608,7 +709,28 @@ export function CartScreen() {
             </div>
             <div>
               <label style={sheetLabel}>배송지 주소</label>
-              <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} required placeholder="배송지 주소를 상세히 입력해 주세요." disabled={loading} />
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                <input style={{ ...sheetInput, width: "100%" }} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} required placeholder="주소 검색 후 상세 주소를 추가해 주세요." disabled={loading} />
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => openAddressSearch({ onSelect: setShippingAddress, onError: showToast })}
+                  disabled={loading}
+                  style={{ width: 92, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: loading ? "default" : "pointer" }}
+                >
+                  주소 찾기
+                </button>
+              </div>
+              {shippingProfile?.address && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>기본 배송지를 불러왔습니다.</div>
+              )}
+              <div style={{ marginTop: 10 }}>
+                <ConsentCheckbox
+                  checked={saveAsDefault}
+                  onChange={setSaveAsDefault}
+                  label="이 배송지를 기본 배송지로 저장"
+                />
+              </div>
             </div>
             <div>
               <label style={{ ...sheetLabel, marginBottom: 6, display: "block" }}>결제 수단</label>
@@ -635,21 +757,39 @@ export function CartScreen() {
 // ============================================================
 // MY PAGE & ONBOARDING
 // ============================================================
-export function MyScreen({ orders = [] }) {
+export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = null, shippingProfile = null }) {
   const router = useRouter();
   const { sellers, likes, showToast } = useApp();
   const { user, signOut } = useAuth();
   const supabase = createClient();
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [authOpen, setAuthOpen] = useState(null); // 'signin' | 'signup' | null
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [shippingName, setShippingName] = useState(shippingProfile?.name || "");
+  const [shippingPhone, setShippingPhone] = useState(shippingProfile?.phone || "");
+  const [shippingAddress, setShippingAddress] = useState(shippingProfile?.address || "");
+  const [shippingSaving, setShippingSaving] = useState(false);
   // 회원가입 약관 동의 상태
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentPrivacy, setConsentPrivacy] = useState(false);
+
+  useEffect(() => {
+    if (!user && ["signin", "signup"].includes(initialAuthMode)) {
+      setAuthOpen(initialAuthMode);
+    }
+  }, [initialAuthMode, user]);
+
+  useEffect(() => {
+    if (!shippingProfile) return;
+    setShippingName(shippingProfile.name || "");
+    setShippingPhone(shippingProfile.phone || "");
+    setShippingAddress(shippingProfile.address || "");
+  }, [shippingProfile]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -683,7 +823,38 @@ export function MyScreen({ orders = [] }) {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       setAuthLoading(false);
       if (error) { alert("로그인 에러: " + error.message); }
-      else { showToast("로그인에 성공했습니다!"); setAuthOpen(null); setAuthEmail(""); setAuthPassword(""); }
+      else {
+        showToast("로그인에 성공했습니다!");
+        setAuthOpen(null);
+        setAuthEmail("");
+        setAuthPassword("");
+        if (authReturnTo) router.push(authReturnTo);
+        else router.refresh();
+      }
+    }
+  };
+
+  const handleShippingProfileSubmit = async (e) => {
+    e.preventDefault();
+    setShippingSaving(true);
+    try {
+      const result = await updateMyShippingProfile({
+        name: shippingName,
+        phone: shippingPhone,
+        address: shippingAddress,
+      });
+      if (result?.profile) {
+        setShippingName(result.profile.name || "");
+        setShippingPhone(result.profile.phone || "");
+        setShippingAddress(result.profile.address || "");
+      }
+      showToast("기본 배송지를 저장했습니다.");
+      setSettingsOpen(false);
+      router.refresh();
+    } catch (error) {
+      showToast(error.message || "배송지 저장에 실패했습니다.");
+    } finally {
+      setShippingSaving(false);
     }
   };
 
@@ -759,7 +930,10 @@ export function MyScreen({ orders = [] }) {
           } },
           { label: "저장한 도구", action: () => router.push("/saved") },
           { label: "고객센터", action: () => {} },
-          { label: "설정", action: () => {} },
+          { label: "설정", action: () => {
+            if (!user) { setAuthOpen("signin"); return; }
+            setSettingsOpen(true);
+          } },
         ].map((item, i) => (
           <div key={item.label} onClick={item.action}
             style={{ display: "flex", alignItems: "center", padding: "16px 18px", borderTop: i === 0 ? "1px solid var(--line)" : "none", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
@@ -807,6 +981,38 @@ export function MyScreen({ orders = [] }) {
               <div style={{ padding: "50px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>주문하신 내역이 없습니다.</div>
             )}
           </div>
+        </ModalSheet>
+      )}
+
+      {settingsOpen && (
+        <ModalSheet title="배송지 설정" onClose={() => !shippingSaving && setSettingsOpen(false)}>
+          <form onSubmit={handleShippingProfileSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={sheetLabel}>기본 수령인</label>
+              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                <input style={sheetInput} value={shippingName} onChange={(e) => setShippingName(e.target.value)} required placeholder="이름" disabled={shippingSaving} />
+                <input style={sheetInput} value={shippingPhone} onChange={(e) => setShippingPhone(e.target.value)} required placeholder="연락처" disabled={shippingSaving} />
+              </div>
+            </div>
+            <div>
+              <label style={sheetLabel}>기본 배송지</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                <input style={{ ...sheetInput, width: "100%" }} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} required placeholder="주소 검색 후 상세 주소를 추가해 주세요." disabled={shippingSaving} />
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => openAddressSearch({ onSelect: setShippingAddress, onError: showToast })}
+                  disabled={shippingSaving}
+                  style={{ width: 92, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: shippingSaving ? "default" : "pointer" }}
+                >
+                  주소 찾기
+                </button>
+              </div>
+            </div>
+            <button className="buy" type="submit" style={{ width: "100%" }} disabled={shippingSaving}>
+              {shippingSaving ? "저장 중..." : "기본 배송지 저장"}
+            </button>
+          </form>
         </ModalSheet>
       )}
 

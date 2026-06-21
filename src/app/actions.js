@@ -120,6 +120,33 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function validateShippingProfileInput({ name, phone, address } = {}) {
+  const clean = {
+    name: cleanText(name),
+    phone: cleanText(phone),
+    address: cleanText(address),
+  };
+
+  if (!clean.name) throw new Error("수령인 이름은 필수 입력 항목입니다.");
+  if (clean.name.length > 50) throw new Error("수령인 이름은 50자 이하여야 합니다.");
+  if (!clean.phone) throw new Error("수령인 연락처는 필수 입력 항목입니다.");
+  if (clean.phone.length > 30) throw new Error("수령인 연락처는 30자 이하여야 합니다.");
+  if (!clean.address) throw new Error("배송지 주소는 필수 입력 항목입니다.");
+  if (clean.address.length > 300) throw new Error("배송지 주소는 300자 이하여야 합니다.");
+
+  return clean;
+}
+
+function formatShippingProfile(user, authUser) {
+  const fallbackEmailName = cleanText(authUser?.email).split("@")[0] || "";
+  const fallbackName = cleanText(user?.name) || cleanText(authUser?.user_metadata?.name) || fallbackEmailName;
+  return {
+    name: cleanText(user?.defaultShippingName) || fallbackName,
+    phone: cleanText(user?.defaultShippingPhone),
+    address: cleanText(user?.defaultShippingAddress),
+  };
+}
+
 function normalizeProductImageUrl(value) {
   const imageUrl = cleanText(value);
   if (!imageUrl) return "";
@@ -709,6 +736,67 @@ export async function getUserOrders() {
   } catch (error) {
     console.error("Failed to load user orders:", error);
     return [];
+  }
+}
+
+export async function getMyShippingProfile() {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: {
+        name: true,
+        defaultShippingName: true,
+        defaultShippingPhone: true,
+        defaultShippingAddress: true,
+      },
+    });
+
+    return formatShippingProfile(user, authUser);
+  } catch (error) {
+    console.error("Failed to load shipping profile:", error);
+    return null;
+  }
+}
+
+export async function updateMyShippingProfile(input) {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) throw new Error("로그인이 필요합니다.");
+    const email = cleanText(authUser.email);
+    if (!email) throw new Error("이메일 정보를 확인할 수 없습니다.");
+
+    const clean = validateShippingProfileInput(input);
+    const user = await prisma.user.upsert({
+      where: { id: authUser.id },
+      update: {
+        defaultShippingName: clean.name,
+        defaultShippingPhone: clean.phone,
+        defaultShippingAddress: clean.address,
+      },
+      create: {
+        id: authUser.id,
+        email,
+        name: clean.name,
+        role: "BUYER",
+        defaultShippingName: clean.name,
+        defaultShippingPhone: clean.phone,
+        defaultShippingAddress: clean.address,
+      },
+      select: {
+        name: true,
+        defaultShippingName: true,
+        defaultShippingPhone: true,
+        defaultShippingAddress: true,
+      },
+    });
+
+    return { success: true, profile: formatShippingProfile(user, authUser) };
+  } catch (error) {
+    console.error("Failed to update shipping profile:", error);
+    throw new Error(error.message || "배송지 저장에 실패했습니다.");
   }
 }
 
