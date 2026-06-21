@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 const mockGetUser = vi.fn();
+const mockSignUp = vi.fn();
 vi.mock("../utils/supabase/server", () => ({
   createClient: vi.fn(() =>
-    Promise.resolve({ auth: { getUser: mockGetUser } })
+    Promise.resolve({ auth: { getUser: mockGetUser, signUp: mockSignUp } })
   ),
 }));
 
@@ -26,7 +27,10 @@ const mockPrisma = {
   settlement: { updateMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   csInquiry: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   csReply: { create: vi.fn() },
+  phoneVerification: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+  termsVersion: { findFirst: vi.fn() },
+  consentRecord: { upsert: vi.fn() },
   seller: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
@@ -39,6 +43,8 @@ const {
   createOrder,
   getMyShippingProfile,
   prepareCheckout,
+  registerBuyer,
+  requestSignupPhoneVerification,
   syncUser,
   toggleLike,
   toggleFollow,
@@ -50,6 +56,7 @@ const {
   updateAdminRefundStatus,
   updateAdminSettlementStatus,
   updateMyShippingProfile,
+  verifySignupPhoneCode,
 } = await import("../app/actions.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -333,6 +340,129 @@ describe("shipping profile", () => {
       address: "서울시 강남구",
       addressDetail: "101동 202호",
     })).rejects.toThrow("로그인이 필요합니다.");
+  });
+});
+
+describe("signup phone verification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.PHONE_VERIFICATION_SECRET = "test-phone-secret";
+    process.env.NAVER_SENS_SERVICE_ID = "";
+    process.env.NAVER_SENS_ACCESS_KEY = "";
+    process.env.NAVER_SENS_SECRET_KEY = "";
+    process.env.NAVER_SENS_SMS_FROM = "";
+  });
+
+  it("회원가입 휴대폰 인증번호를 생성하고 개발용 코드를 반환한다", async () => {
+    mockPrisma.phoneVerification.findFirst.mockResolvedValue(null);
+    mockPrisma.phoneVerification.create.mockResolvedValue({ id: "verification-1" });
+
+    const result = await requestSignupPhoneVerification({ phone: "010-1234-5678" });
+
+    expect(result.success).toBe(true);
+    expect(result.phone).toBe("01012345678");
+    expect(result.debugCode).toMatch(/^\d{6}$/);
+    expect(mockPrisma.phoneVerification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        phone: "01012345678",
+        purpose: "SIGNUP",
+        codeHash: expect.any(String),
+        expiresAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it("인증번호가 맞으면 인증 완료 처리한다", async () => {
+    mockPrisma.phoneVerification.findFirst.mockResolvedValueOnce(null);
+    mockPrisma.phoneVerification.create.mockImplementation(async ({ data }) => ({ id: "verification-1", ...data }));
+
+    const request = await requestSignupPhoneVerification({ phone: "01012345678" });
+    const created = mockPrisma.phoneVerification.create.mock.calls[0][0].data;
+
+    mockPrisma.phoneVerification.findFirst.mockResolvedValueOnce({
+      id: "verification-1",
+      phone: "01012345678",
+      purpose: "SIGNUP",
+      codeHash: created.codeHash,
+      attempts: 0,
+      expiresAt: created.expiresAt,
+    });
+    mockPrisma.phoneVerification.update.mockResolvedValue({});
+
+    const result = await verifySignupPhoneCode({ phone: "01012345678", code: request.debugCode });
+
+    expect(result).toEqual({ success: true, phone: "01012345678" });
+    expect(mockPrisma.phoneVerification.update).toHaveBeenCalledWith({
+      where: { id: "verification-1" },
+      data: { verifiedAt: expect.any(Date) },
+    });
+  });
+
+  it("휴대폰 인증이 완료된 경우에만 구매자 회원가입을 완료한다", async () => {
+    mockPrisma.phoneVerification.findFirst.mockResolvedValue({
+      id: "verification-1",
+      phone: "01012345678",
+      verifiedAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockSignUp.mockResolvedValue({
+      data: {
+        user: { id: "new-user", email: "buyer@example.com" },
+        session: null,
+      },
+      error: null,
+    });
+    mockPrisma.user.upsert.mockResolvedValue({ id: "new-user" });
+    mockPrisma.termsVersion.findFirst.mockImplementation(async ({ where }) => ({ id: `${where.type}-v1` }));
+    mockPrisma.consentRecord.upsert.mockResolvedValue({});
+    mockPrisma.phoneVerification.update.mockResolvedValue({});
+
+    const result = await registerBuyer({
+      name: "구매자",
+      phone: "010-1234-5678",
+      email: "buyer@example.com",
+      password: "password1",
+      consentedTypes: ["USER_TERMS", "PRIVACY_POLICY"],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailConfirmationRequired).toBe(true);
+    expect(mockSignUp).toHaveBeenCalledWith({
+      email: "buyer@example.com",
+      password: "password1",
+      options: { data: { name: "구매자", phone: "01012345678" } },
+    });
+    expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
+      where: { id: "new-user" },
+      update: {
+        email: "buyer@example.com",
+        name: "구매자",
+        phone: "01012345678",
+      },
+      create: {
+        id: "new-user",
+        email: "buyer@example.com",
+        name: "구매자",
+        phone: "01012345678",
+        role: "BUYER",
+      },
+    });
+    expect(mockPrisma.phoneVerification.update).toHaveBeenCalledWith({
+      where: { id: "verification-1" },
+      data: { consumedAt: expect.any(Date) },
+    });
+  });
+
+  it("휴대폰 인증 없이는 회원가입을 막는다", async () => {
+    mockPrisma.phoneVerification.findFirst.mockResolvedValue(null);
+
+    await expect(registerBuyer({
+      name: "구매자",
+      phone: "01012345678",
+      email: "buyer@example.com",
+      password: "password1",
+      consentedTypes: ["USER_TERMS", "PRIVACY_POLICY"],
+    })).rejects.toThrow("휴대폰 인증을 완료해 주세요.");
   });
 });
 

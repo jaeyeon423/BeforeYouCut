@@ -93,6 +93,7 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 Primary models:
 
 - `User`: Supabase Auth user mirror. `role` is `BUYER | SELLER | ADMIN`; `phone` plus default shipping fields are used to prefill buyer checkout, with `defaultShippingAddressDetail` storing unit/floor/detail address separately.
+- `PhoneVerification`: pre-signup SMS OTP sessions. Stores hashed codes, expiry, attempts, verified/consumed timestamps, and is consumed by buyer registration.
 - `Seller`: brand profile plus seller type/business fields. One seller per user via unique `userId`.
 - `Product`: seller-owned product. `images` is a JSON array of public image URLs; `reviewStatus` controls admin review (`PENDING | APPROVED | REJECTED`); `isActive/deletedAt` control visibility; `spec` is JSON array used on detail pages.
 - Product detail body sections are also stored in `Product.spec` as reserved key/value rows such as `상세 소개`, `핵심 포인트`, `사용/관리 팁`, `배송 안내`, `교환/반품 안내`, and `구매 전 확인사항`. Use `src/utils/product-detail.js` to parse/build this structure instead of hand-parsing it.
@@ -149,12 +150,13 @@ Environment and secrets:
 - Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
 - Product detail has a buyer-facing direct order flow: `replaceCart([product])` then `/cart?checkout=1`, where cart auto-opens checkout or sends guests to `/my?auth=signin&returnTo=/cart?checkout=1`.
 - Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget, and unit/floor details are captured in a separate detail-address field before being composed into the final order address.
-- Signup collects buyer name and phone in Supabase Auth metadata; `AuthProvider` passes those values to `syncUser` so checkout orderer info can be prefilled.
+- Signup uses a shopping-mall style flow in `/my`: buyer name/phone, SMS OTP verification, email/password, required terms. `registerBuyer` performs final server-side signup only after `PhoneVerification` is verified.
+- SMS OTP uses NAVER Cloud SENS when `NAVER_SENS_*` env vars are configured; local/test environments return/log a debug code instead.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.
 - Supabase client helpers no longer fall back to placeholder project credentials; missing public Supabase env vars fail explicitly.
-- `prisma/clear.js` no longer recreates the old `user_default` guest account and now clears operational tables such as settlements, refunds, shipments, CS, audit logs, and bank accounts.
+- `prisma/clear.js` no longer recreates the old `user_default` guest account and now clears operational tables such as settlements, refunds, shipments, CS, audit logs, phone verifications, and bank accounts.
 - Public buyer-facing loaders expose only active, non-deleted sellers and products owned by those sellers; inactive temporary seller accounts can still use `/seller` but are hidden from marketplace pages.
 - Home, seller profile, and my-page surfaces intentionally avoid Musinsa-scale fandom/ranking/review placeholders; prioritize specs, seller trust, shipping/returns, and purchase decisions.
 - Public service name is now `미용사` with `MIYONGSA` as the wordmark style. Fake public business values must not be displayed; use `src/site.config.js` and hide unknown legal values until the user provides real ones.

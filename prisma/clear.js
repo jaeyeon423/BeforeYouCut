@@ -81,6 +81,9 @@ async function main() {
   const consentsDeleted = await prisma.consentRecord.deleteMany({});
   console.log(`Deleted ${consentsDeleted.count} consent records.`);
 
+  const phoneVerificationsDeleted = await prisma.phoneVerification.deleteMany({});
+  console.log(`Deleted ${phoneVerificationsDeleted.count} phone verification records.`);
+
   const usersDeleted = await prisma.user.deleteMany({});
   console.log(`Deleted ${usersDeleted.count} users.`);
 

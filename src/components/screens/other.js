@@ -12,8 +12,10 @@ import {
   createInquiry,
   getCategoryProducts,
   prepareCheckout,
-  recordConsents,
+  registerBuyer,
+  requestSignupPhoneVerification,
   updateMyShippingProfile,
+  verifySignupPhoneCode,
 } from '@/app/actions';
 import {
   Placeholder,
@@ -784,6 +786,11 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const [authOpen, setAuthOpen] = useState(null); // 'signin' | 'signup' | null
   const [authName, setAuthName] = useState("");
   const [authPhone, setAuthPhone] = useState("");
+  const [authPhoneCode, setAuthPhoneCode] = useState("");
+  const [authPhoneSent, setAuthPhoneSent] = useState(false);
+  const [authPhoneVerified, setAuthPhoneVerified] = useState(false);
+  const [authPhoneDebugCode, setAuthPhoneDebugCode] = useState("");
+  const [authPhoneLoading, setAuthPhoneLoading] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -810,6 +817,66 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
     setShippingAddressDetail(shippingProfile.addressDetail || "");
   }, [shippingProfile]);
 
+  const resetSignupVerification = () => {
+    setAuthPhoneCode("");
+    setAuthPhoneSent(false);
+    setAuthPhoneVerified(false);
+    setAuthPhoneDebugCode("");
+  };
+
+  const resetSignupForm = () => {
+    setAuthName("");
+    setAuthPhone("");
+    setAuthEmail("");
+    setAuthPassword("");
+    setConsentTerms(false);
+    setConsentPrivacy(false);
+    resetSignupVerification();
+  };
+
+  const handleAuthPhoneChange = (value) => {
+    setAuthPhone(value);
+    if (authPhoneSent || authPhoneVerified) resetSignupVerification();
+  };
+
+  const handleRequestPhoneVerification = async () => {
+    if (!authPhone.trim()) {
+      alert("휴대폰 번호를 입력해 주세요.");
+      return;
+    }
+    setAuthPhoneLoading(true);
+    try {
+      const result = await requestSignupPhoneVerification({ phone: authPhone });
+      setAuthPhoneSent(true);
+      setAuthPhoneVerified(false);
+      setAuthPhoneCode("");
+      setAuthPhoneDebugCode(result.debugCode || "");
+      showToast("인증번호를 발송했습니다.");
+    } catch (error) {
+      showToast(error.message || "인증번호 발송에 실패했습니다.");
+    } finally {
+      setAuthPhoneLoading(false);
+    }
+  };
+
+  const handleVerifyPhoneCode = async () => {
+    if (!authPhoneCode.trim()) {
+      alert("인증번호를 입력해 주세요.");
+      return;
+    }
+    setAuthPhoneLoading(true);
+    try {
+      await verifySignupPhoneCode({ phone: authPhone, code: authPhoneCode });
+      setAuthPhoneVerified(true);
+      setAuthPhoneDebugCode("");
+      showToast("휴대폰 인증이 완료되었습니다.");
+    } catch (error) {
+      showToast(error.message || "휴대폰 인증에 실패했습니다.");
+    } finally {
+      setAuthPhoneLoading(false);
+    }
+  };
+
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
@@ -830,29 +897,33 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
       alert("연락처는 30자 이하여야 합니다.");
       return;
     }
+    if (authOpen === "signup" && !authPhoneVerified) {
+      alert("휴대폰 인증을 완료해 주세요.");
+      return;
+    }
 
     setAuthLoading(true);
     if (authOpen === "signup") {
-      const { error } = await supabase.auth.signUp({
-        email: authEmail,
-        password: authPassword,
-        options: { data: { name: authName.trim(), phone: authPhone.trim() } },
-      });
-      setAuthLoading(false);
-      if (error) { alert("회원가입 에러: " + error.message); }
-      else {
-        // 동의 이력 서버 저장 (비동기 — 실패해도 가입 흐름 중단 안 함)
-        recordConsents({
+      try {
+        const result = await registerBuyer({
+          name: authName,
+          phone: authPhone,
+          email: authEmail,
+          password: authPassword,
           consentedTypes: ["USER_TERMS", "PRIVACY_POLICY"],
-        }).catch((e) => console.error("consent record failed:", e));
-        showToast("회원가입이 완료되었습니다. 로그인해 주세요.");
-        setAuthName("");
-        setAuthPhone("");
-        setAuthEmail("");
-        setAuthPassword("");
-        setConsentTerms(false);
-        setConsentPrivacy(false);
-        setAuthOpen("signin");
+        });
+        showToast(result.emailConfirmationRequired ? "회원가입이 완료되었습니다. 이메일 확인 후 로그인해 주세요." : "회원가입이 완료되었습니다.");
+        resetSignupForm();
+        if (result.emailConfirmationRequired) {
+          setAuthOpen("signin");
+        } else {
+          setAuthOpen(null);
+          router.refresh();
+        }
+      } catch (error) {
+        alert("회원가입 에러: " + (error.message || "회원가입에 실패했습니다."));
+      } finally {
+        setAuthLoading(false);
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
@@ -926,7 +997,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
             <button className="buy" style={{ flex: 1, padding: "10px 0", height: "auto", fontSize: 13 }} onClick={() => setAuthOpen("signin")}>로그인</button>
-            <button className="btn-ghost" style={{ flex: 1, padding: "10px 0", height: "auto", fontSize: 13, border: "1px solid var(--line)" }} onClick={() => setAuthOpen("signup")}>회원가입</button>
+            <button className="btn-ghost" style={{ flex: 1, padding: "10px 0", height: "auto", fontSize: 13, border: "1px solid var(--line)" }} onClick={() => { resetSignupForm(); setAuthOpen("signup"); }}>회원가입</button>
           </div>
         </div>
       )}
@@ -1066,19 +1137,65 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
             {authOpen === "signup" && (
               <div>
                 <label style={sheetLabel}>기본 정보</label>
-                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
                   <input style={sheetInput} value={authName} onChange={(e) => setAuthName(e.target.value)} required placeholder="이름" disabled={authLoading} />
-                  <input style={sheetInput} value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} required placeholder="연락처" disabled={authLoading} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      style={{ ...sheetInput, width: "100%" }}
+                      value={authPhone}
+                      onChange={(e) => handleAuthPhoneChange(e.target.value)}
+                      required
+                      placeholder="휴대폰 번호"
+                      disabled={authLoading || authPhoneLoading || authPhoneVerified}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={handleRequestPhoneVerification}
+                      disabled={authLoading || authPhoneLoading || authPhoneVerified}
+                      style={{ width: 98, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: authLoading || authPhoneLoading || authPhoneVerified ? "default" : "pointer" }}
+                    >
+                      {authPhoneSent ? "재전송" : "인증요청"}
+                    </button>
+                  </div>
+                  {authPhoneSent && !authPhoneVerified && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        style={{ ...sheetInput, width: "100%" }}
+                        value={authPhoneCode}
+                        onChange={(e) => setAuthPhoneCode(e.target.value)}
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="인증번호 6자리"
+                        disabled={authLoading || authPhoneLoading}
+                      />
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={handleVerifyPhoneCode}
+                        disabled={authLoading || authPhoneLoading}
+                        style={{ width: 98, border: "1px solid var(--line)", borderRadius: 6, background: "#fff", fontWeight: 800, fontSize: 12.5, cursor: authLoading || authPhoneLoading ? "default" : "pointer" }}
+                      >
+                        확인
+                      </button>
+                    </div>
+                  )}
+                  {authPhoneDebugCode && (
+                    <div style={{ fontSize: 11.5, color: "var(--muted)" }}>개발용 인증번호: {authPhoneDebugCode}</div>
+                  )}
+                  {authPhoneVerified && (
+                    <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 800 }}>휴대폰 인증 완료</div>
+                  )}
                 </div>
               </div>
             )}
             <div>
               <label style={sheetLabel}>이메일 주소</label>
-              <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} required placeholder="email@example.com" disabled={authLoading} />
+              <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} required placeholder="email@example.com" disabled={authLoading || (authOpen === "signup" && !authPhoneVerified)} />
             </div>
             <div>
               <label style={sheetLabel}>비밀번호 (6자 이상)</label>
-              <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required placeholder="••••••••" disabled={authLoading} minLength={6} />
+              <input style={{ ...sheetInput, width: "100%", marginTop: 6 }} type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required placeholder="••••••••" disabled={authLoading || (authOpen === "signup" && !authPhoneVerified)} minLength={6} />
             </div>
             {/* 회원가입 약관 동의 — 개인정보보호법 제22조 */}
             {authOpen === "signup" && (
@@ -1103,15 +1220,15 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
             )}
 
             <div style={{ marginTop: 8 }}>
-              <button className="buy" type="submit" style={{ width: "100%" }} disabled={authLoading}>
-                {authLoading ? "처리 중..." : authOpen === "signin" ? "로그인하기" : "가입하기"}
+              <button className="buy" type="submit" style={{ width: "100%" }} disabled={authLoading || authPhoneLoading || (authOpen === "signup" && !authPhoneVerified)}>
+                {authLoading ? "처리 중..." : authOpen === "signin" ? "로그인하기" : authPhoneVerified ? "가입하기" : "휴대폰 인증 필요"}
               </button>
             </div>
             <div style={{ textAlign: "center", marginTop: 10, fontSize: 12.5, color: "var(--ink-soft)" }}>
               {authOpen === "signin" ? (
-                <span>계정이 없으신가요? <button type="button" style={linkBtn} onClick={() => { setAuthOpen("signup"); setConsentTerms(false); setConsentPrivacy(false); }}>회원가입</button></span>
+                <span>계정이 없으신가요? <button type="button" style={linkBtn} onClick={() => { resetSignupForm(); setAuthOpen("signup"); }}>회원가입</button></span>
               ) : (
-                <span>이미 계정이 있으신가요? <button type="button" style={linkBtn} onClick={() => setAuthOpen("signin")}>로그인</button></span>
+                <span>이미 계정이 있으신가요? <button type="button" style={linkBtn} onClick={() => { resetSignupForm(); setAuthOpen("signin"); }}>로그인</button></span>
               )}
             </div>
           </form>

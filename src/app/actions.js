@@ -120,6 +120,112 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function normalizeKoreanMobilePhone(value) {
+  const digits = cleanText(value).replace(/\D/g, "");
+  if (!/^01[016789]\d{7,8}$/.test(digits)) {
+    throw new Error("올바른 휴대폰 번호를 입력해 주세요.");
+  }
+  return digits;
+}
+
+function validateBuyerSignupInput({ name, phone, email, password } = {}) {
+  const clean = {
+    name: cleanText(name),
+    phone: normalizeKoreanMobilePhone(phone),
+    email: cleanText(email).toLowerCase(),
+    password: String(password || ""),
+  };
+
+  if (!clean.name) throw new Error("이름을 입력해 주세요.");
+  if (clean.name.length > 50) throw new Error("이름은 50자 이하여야 합니다.");
+  if (!clean.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email)) throw new Error("올바른 이메일 주소를 입력해 주세요.");
+  if (clean.password.length < 6) throw new Error("비밀번호는 6자 이상이어야 합니다.");
+
+  return clean;
+}
+
+function getPhoneVerificationSecret() {
+  const secret = process.env.PHONE_VERIFICATION_SECRET || process.env.ENCRYPTION_KEY || process.env.SUPABASE_JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("PHONE_VERIFICATION_SECRET 환경변수를 설정해 주세요.");
+  }
+  return secret || "dev-phone-verification-secret";
+}
+
+function hashPhoneVerificationCode(phone, code) {
+  return crypto
+    .createHmac("sha256", getPhoneVerificationSecret())
+    .update(`${PHONE_VERIFICATION_PURPOSE}:${phone}:${code}`)
+    .digest("hex");
+}
+
+function createPhoneVerificationCode() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function getNaverSensConfig() {
+  const serviceId = cleanText(process.env.NAVER_SENS_SERVICE_ID);
+  const accessKey = cleanText(process.env.NAVER_SENS_ACCESS_KEY);
+  const secretKey = cleanText(process.env.NAVER_SENS_SECRET_KEY);
+  const from = cleanText(process.env.NAVER_SENS_SMS_FROM).replace(/\D/g, "");
+  if (!serviceId || !accessKey || !secretKey || !from) return null;
+  return { serviceId, accessKey, secretKey, from };
+}
+
+function createNaverSensSignature({ method, uri, timestamp, accessKey, secretKey }) {
+  return crypto
+    .createHmac("sha256", secretKey)
+    .update(`${method} ${uri}\n${timestamp}\n${accessKey}`)
+    .digest("base64");
+}
+
+async function sendPhoneVerificationSms(phone, code) {
+  const config = getNaverSensConfig();
+  if (!config) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("문자 발송 환경변수를 설정해야 휴대폰 인증을 사용할 수 있습니다.");
+    }
+    console.info(`[dev] 미용사 휴대폰 인증번호 ${code} -> ${phone}`);
+    return { provider: "debug" };
+  }
+
+  const method = "POST";
+  const uri = `/sms/v2/services/${config.serviceId}/messages`;
+  const timestamp = Date.now().toString();
+  const signature = createNaverSensSignature({
+    method,
+    uri,
+    timestamp,
+    accessKey: config.accessKey,
+    secretKey: config.secretKey,
+  });
+
+  const response = await fetch(`https://sens.apigw.ntruss.com${uri}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": timestamp,
+      "x-ncp-iam-access-key": config.accessKey,
+      "x-ncp-apigw-signature-v2": signature,
+    },
+    body: JSON.stringify({
+      type: "SMS",
+      contentType: "COMM",
+      countryCode: "82",
+      from: config.from,
+      content: `[미용사] 인증번호 ${code}를 입력해 주세요. 5분간 유효합니다.`,
+      messages: [{ to: phone }],
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`문자 발송에 실패했습니다.${detail ? ` (${detail.slice(0, 120)})` : ""}`);
+  }
+
+  return { provider: "naver-sens" };
+}
+
 function validateShippingProfileInput({ name, phone, address, addressDetail } = {}) {
   const clean = {
     name: cleanText(name),
@@ -234,6 +340,10 @@ const REFUNDABLE_ORDER_STATUSES = new Set(["결제완료", "배송 준비중", "
 const REFUND_STATUSES = ["REQUESTED", "APPROVED", "REJECTED", "COMPLETED"];
 const INQUIRY_TYPES = ["INQUIRY", "REFUND_REQUEST", "REPORT", "ETC"];
 const INQUIRY_STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED"];
+const PHONE_VERIFICATION_PURPOSE = "SIGNUP";
+const PHONE_VERIFICATION_TTL_MS = 5 * 60 * 1000;
+const PHONE_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+const PHONE_VERIFICATION_MAX_ATTEMPTS = 5;
 const TOSS_SDK_URL = "https://js.tosspayments.com/v2/standard";
 const TOSS_CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
 
@@ -809,6 +919,160 @@ export async function updateMyShippingProfile(input) {
     console.error("Failed to update shipping profile:", error);
     throw new Error(error.message || "배송지 저장에 실패했습니다.");
   }
+}
+
+export async function requestSignupPhoneVerification({ phone } = {}) {
+  const normalizedPhone = normalizeKoreanMobilePhone(phone);
+  const now = new Date();
+  const recentCutoff = new Date(now.getTime() - PHONE_VERIFICATION_RESEND_COOLDOWN_MS);
+
+  const recentRequest = await prisma.phoneVerification.findFirst({
+    where: {
+      phone: normalizedPhone,
+      purpose: PHONE_VERIFICATION_PURPOSE,
+      createdAt: { gt: recentCutoff },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (recentRequest) {
+    throw new Error("인증번호는 1분 후 다시 요청할 수 있습니다.");
+  }
+
+  const code = createPhoneVerificationCode();
+  const verification = await prisma.phoneVerification.create({
+    data: {
+      phone: normalizedPhone,
+      purpose: PHONE_VERIFICATION_PURPOSE,
+      codeHash: hashPhoneVerificationCode(normalizedPhone, code),
+      expiresAt: new Date(now.getTime() + PHONE_VERIFICATION_TTL_MS),
+    },
+  });
+
+  try {
+    const delivery = await sendPhoneVerificationSms(normalizedPhone, code);
+    return {
+      success: true,
+      phone: normalizedPhone,
+      expiresInSeconds: PHONE_VERIFICATION_TTL_MS / 1000,
+      debugCode: delivery.provider === "debug" ? code : null,
+    };
+  } catch (error) {
+    await prisma.phoneVerification.delete({ where: { id: verification.id } }).catch(() => {});
+    throw new Error(error.message || "인증번호 발송에 실패했습니다.");
+  }
+}
+
+export async function verifySignupPhoneCode({ phone, code } = {}) {
+  const normalizedPhone = normalizeKoreanMobilePhone(phone);
+  const cleanCode = cleanText(code);
+  if (!/^\d{6}$/.test(cleanCode)) throw new Error("인증번호 6자리를 입력해 주세요.");
+
+  const verification = await prisma.phoneVerification.findFirst({
+    where: {
+      phone: normalizedPhone,
+      purpose: PHONE_VERIFICATION_PURPOSE,
+      verifiedAt: null,
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!verification) throw new Error("유효한 인증 요청이 없습니다. 인증번호를 다시 요청해 주세요.");
+  if (verification.attempts >= PHONE_VERIFICATION_MAX_ATTEMPTS) {
+    throw new Error("인증번호 입력 횟수를 초과했습니다. 다시 요청해 주세요.");
+  }
+
+  const expectedHash = hashPhoneVerificationCode(normalizedPhone, cleanCode);
+  if (expectedHash !== verification.codeHash) {
+    await prisma.phoneVerification.update({
+      where: { id: verification.id },
+      data: { attempts: { increment: 1 } },
+    });
+    throw new Error("인증번호가 일치하지 않습니다.");
+  }
+
+  await prisma.phoneVerification.update({
+    where: { id: verification.id },
+    data: { verifiedAt: new Date() },
+  });
+
+  return { success: true, phone: normalizedPhone };
+}
+
+export async function registerBuyer({ name, phone, email, password, consentedTypes } = {}) {
+  const clean = validateBuyerSignupInput({ name, phone, email, password });
+  if (!Array.isArray(consentedTypes) || !consentedTypes.includes("USER_TERMS") || !consentedTypes.includes("PRIVACY_POLICY")) {
+    throw new Error("필수 약관에 동의해 주세요.");
+  }
+
+  const verification = await prisma.phoneVerification.findFirst({
+    where: {
+      phone: clean.phone,
+      purpose: PHONE_VERIFICATION_PURPOSE,
+      verifiedAt: { not: null },
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { verifiedAt: "desc" },
+  });
+  if (!verification) throw new Error("휴대폰 인증을 완료해 주세요.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email: clean.email,
+    password: clean.password,
+    options: { data: { name: clean.name, phone: clean.phone } },
+  });
+  if (error) throw new Error(error.message || "회원가입에 실패했습니다.");
+  if (!data?.user?.id) throw new Error("회원가입 사용자 정보를 확인할 수 없습니다.");
+
+  await prisma.user.upsert({
+    where: { id: data.user.id },
+    update: {
+      email: clean.email,
+      name: clean.name,
+      phone: clean.phone,
+    },
+    create: {
+      id: data.user.id,
+      email: clean.email,
+      name: clean.name,
+      phone: clean.phone,
+      role: "BUYER",
+    },
+  });
+
+  const consentResults = await Promise.all(
+    consentedTypes.map(async (type) => {
+      const latestVersion = await prisma.termsVersion.findFirst({
+        where: { type },
+        orderBy: { effectiveAt: "desc" },
+      });
+      if (!latestVersion) return null;
+      return prisma.consentRecord.upsert({
+        where: { id: `${data.user.id}_${latestVersion.id}` },
+        update: { agreedAt: new Date() },
+        create: {
+          id: `${data.user.id}_${latestVersion.id}`,
+          userId: data.user.id,
+          termsVersionId: latestVersion.id,
+        },
+      });
+    })
+  );
+
+  await prisma.phoneVerification.update({
+    where: { id: verification.id },
+    data: { consumedAt: new Date() },
+  });
+
+  return {
+    success: true,
+    emailConfirmationRequired: !data.session,
+    recordedConsents: consentResults.filter(Boolean).length,
+  };
 }
 
 /**
