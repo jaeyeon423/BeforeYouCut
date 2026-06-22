@@ -128,6 +128,7 @@ UI:
 - Preserve the existing mobile-first marketplace feel.
 - Use existing components and CSS variables before adding new styling systems.
 - Do not build a marketing landing page when the request is for a product workflow; implement the actual working surface.
+- Keep role surfaces distinct: buyer pages prioritize shopping confidence, order/shipping/account state; seller pages prioritize daily product/order/settlement operations; admin pages prioritize review, KYC, refund, settlement, and CS queues.
 
 Environment and secrets:
 
@@ -156,6 +157,7 @@ Environment and secrets:
 - SMS OTP uses NAVER Cloud SENS when `NAVER_SENS_*` env vars are configured; local/test environments return/log a debug code instead.
 - Future mobile expansion is planned as a Flutter buyer-only app that calls `/api/v1/*`; keep seller/admin web-only for now and move shared business logic into `src/server/services/*` before exposing API routes.
 - Public catalog read logic has started moving into `src/server/services/*`: `actions.js` keeps the Next.js cache/action boundary, while `src/server/services/catalog-service.js` owns product/seller public query rules and formatting.
+- Role-specific UI composition is the product direction: buyer home/my-page surface shopping trust and account state first, seller center starts with daily operation queues, and admin console starts with risk/review queues before detailed lists.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.

@@ -105,8 +105,8 @@ function AdminWorkspace({ dashboard }) {
     <div className="byc-scroll fadein">
       <section style={styles.hero}>
         <div style={styles.kicker}>OPERATIONS</div>
-        <h1 style={styles.title}>출시 운영 점검</h1>
-        <p style={styles.sub}>판매자 승인, 상품 검수, 주문·정산·CS 상태를 한 화면에서 관리합니다.</p>
+        <h1 style={styles.title}>관리자 운영 콘솔</h1>
+        <p style={styles.sub}>검수 대기, 판매자 KYC, 환불, 정산, 문의를 우선순위로 처리합니다.</p>
         <div style={styles.statGrid}>
           <Stat label="검수 대기 상품" value={`${stats.pendingProducts || 0}개`} />
           <Stat label="KYC 대기" value={`${stats.pendingKyc || 0}곳`} />
@@ -115,25 +115,38 @@ function AdminWorkspace({ dashboard }) {
         </div>
       </section>
 
-      <AdminSection title="상품 검수" desc="승인된 상품만 구매자 화면에 노출됩니다.">
+      <section style={styles.section}>
+        <div style={styles.sectionHead}>
+          <h2 style={styles.sectionTitle}>운영 처리 큐</h2>
+          <p style={styles.sectionDesc}>구매자 노출과 결제 이후 리스크에 직접 연결되는 항목입니다.</p>
+        </div>
+        <div style={styles.commandGrid}>
+          <CommandCard href="#admin-products" label="상품 검수" value={`${stats.pendingProducts || 0}개`} desc="승인 전 상품 비노출" urgent={(stats.pendingProducts || 0) > 0} />
+          <CommandCard href="#admin-sellers" label="KYC 승인" value={`${stats.pendingKyc || 0}곳`} desc="판매자 노출·정산 조건" urgent={(stats.pendingKyc || 0) > 0} />
+          <CommandCard href="#admin-orders" label="주문 상태" value={`${stats.orders || 0}건`} desc="배송·취소 상태 점검" />
+          <CommandCard href="#admin-risk" label="환불·CS" value={`${(stats.openRefunds || 0) + (stats.openInquiries || 0)}건`} desc="고객 응대 대기" urgent={(stats.openRefunds || 0) + (stats.openInquiries || 0) > 0} />
+        </div>
+      </section>
+
+      <AdminSection id="admin-products" title="상품 검수" desc="승인된 상품만 구매자 화면에 노출됩니다.">
         {products.length > 0 ? products.map((product) => (
           <ProductReviewRow key={product.id} product={product} />
         )) : <Empty text="검수할 상품이 없습니다." />}
       </AdminSection>
 
-      <AdminSection title="판매자 승인" desc="검증·노출 상태를 관리합니다.">
+      <AdminSection id="admin-sellers" title="판매자 승인" desc="검증·노출 상태를 관리합니다.">
         {sellers.length > 0 ? sellers.map((seller) => (
           <SellerReviewRow key={seller.id} seller={seller} />
         )) : <Empty text="등록된 판매자가 없습니다." />}
       </AdminSection>
 
-      <AdminSection title="주문 관리" desc="배송, 반품, 환불 상태를 운영자가 조정합니다.">
+      <AdminSection id="admin-orders" title="주문 관리" desc="배송, 반품, 환불 상태를 운영자가 조정합니다.">
         {orders.length > 0 ? orders.map((order) => (
           <OrderRow key={order.id} order={order} statuses={options.orderStatuses || []} />
         )) : <Empty text="주문 내역이 없습니다." />}
       </AdminSection>
 
-      <AdminSection title="환불·정산·CS" desc="운영 리스크가 있는 항목을 빠르게 확인합니다.">
+      <AdminSection id="admin-risk" title="환불·정산·CS" desc="운영 리스크가 있는 항목을 빠르게 확인합니다.">
         <MiniPanel title="환불 요청">
           {refunds.length > 0 ? refunds.slice(0, 8).map((refund) => (
             <RefundRow key={refund.id} refund={refund} />
@@ -443,15 +456,28 @@ function InquiryRow({ inquiry }) {
   );
 }
 
-function AdminSection({ title, desc, children }) {
+function AdminSection({ id, title, desc, children }) {
   return (
-    <section style={styles.section}>
+    <section id={id} style={styles.section}>
       <div style={styles.sectionHead}>
         <h2 style={styles.sectionTitle}>{title}</h2>
         {desc && <p style={styles.sectionDesc}>{desc}</p>}
       </div>
       <div style={styles.stack}>{children}</div>
     </section>
+  );
+}
+
+function CommandCard({ href, label, value, desc, urgent }) {
+  return (
+    <a href={href} style={urgent ? { ...styles.commandCard, ...styles.commandCardUrgent } : styles.commandCard}>
+      <div style={styles.commandTop}>
+        <span style={styles.commandLabel}>{label}</span>
+        <Icon name="chev-r-sm" size={14} />
+      </div>
+      <div style={styles.commandValue}>{value}</div>
+      <div style={styles.commandDesc}>{desc}</div>
+    </a>
   );
 }
 
@@ -525,6 +551,13 @@ const styles = {
   sectionHead: { marginBottom: 12 },
   sectionTitle: { margin: 0, fontSize: 17, fontWeight: 900, letterSpacing: 0, color: "var(--ink)" },
   sectionDesc: { margin: "5px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 },
+  commandGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  commandCard: { display: "block", minHeight: 104, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12, textDecoration: "none", color: "inherit" },
+  commandCardUrgent: { borderColor: "rgba(138, 90, 0, 0.28)", background: "rgba(138, 90, 0, 0.05)" },
+  commandTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  commandLabel: { fontSize: 10.5, fontWeight: 900, color: "var(--muted)", letterSpacing: "0.04em" },
+  commandValue: { marginTop: 8, fontSize: 20, fontWeight: 950, color: "var(--ink)", letterSpacing: 0 },
+  commandDesc: { marginTop: 5, fontSize: 11.5, lineHeight: 1.45, color: "var(--ink-soft)" },
   stack: { display: "flex", flexDirection: "column", gap: 10 },
   cardRow: { display: "flex", gap: 12, padding: 12, border: "1px solid var(--line)", borderRadius: 8, background: "#fff" },
   thumb: { width: 62, height: 62, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)", flexShrink: 0 },

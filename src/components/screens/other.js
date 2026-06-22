@@ -1019,6 +1019,38 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         ))}
       </div>
 
+      <div className="account-focus-card">
+        <div className="account-focus-head">
+          <div>
+            <div className="account-focus-kicker">BUYER ACCOUNT</div>
+            <h2>구매 정보</h2>
+          </div>
+          <Icon name="bag" size={22} />
+        </div>
+        <div className="account-focus-grid">
+          <button type="button" onClick={() => setHistoryOpen(true)}>
+            <b>{orders.length}건</b>
+            <span>주문 내역</span>
+          </button>
+          <button type="button" onClick={() => router.push("/saved")}>
+            <b>{likes.size}개</b>
+            <span>저장 상품</span>
+          </button>
+        </div>
+        <div className="account-address-row">
+          <div>
+            <b>기본 배송지</b>
+            <span>{shippingAddress ? composeShippingAddress(shippingAddress, shippingAddressDetail) : "저장된 배송지가 없습니다"}</span>
+          </div>
+          <button type="button" onClick={() => {
+            if (!user) { setAuthOpen("signin"); return; }
+            setSettingsOpen(true);
+          }}>
+            {shippingAddress ? "수정" : "등록"}
+          </button>
+        </div>
+      </div>
+
       <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => {
         if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
         router.push("/seller");

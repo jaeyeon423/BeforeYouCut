@@ -123,6 +123,9 @@ function SellerWorkspace({ dashboard }) {
   const [selectedId, setSelectedId] = useState(products[0]?.id || null);
   const [newProductOpen, setNewProductOpen] = useState(products.length === 0);
   const selected = products.find((p) => p.id === selectedId) || products[0] || null;
+  const pendingReviewProducts = products.filter((product) => product.reviewStatus === "PENDING").length;
+  const rejectedProducts = products.filter((product) => product.reviewStatus === "REJECTED").length;
+  const complianceIssueCount = compliance.issues?.length || 0;
 
   return (
     <div className="byc-scroll fadein">
@@ -144,6 +147,39 @@ function SellerWorkspace({ dashboard }) {
           <Stat label="누적 주문액" value={`${won(stats.totalSales || 0)}원`} />
           <Stat label="처리 주문" value={`${stats.pendingOrders || 0}건`} />
           <Stat label="예정 정산" value={`${won(stats.pendingSettlement || 0)}원`} />
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <SectionTitle
+          title="오늘의 판매 운영"
+          desc="판매 전환에 필요한 항목부터 처리합니다."
+        />
+        <div style={styles.workQueue}>
+          <SellerQueueCard
+            label="입점 상태"
+            value={seller.kycStatus === "APPROVED" ? "승인" : `${complianceIssueCount}개 확인`}
+            desc={seller.kycStatus === "APPROVED" ? "판매자 검증이 완료되었습니다." : "사업자·통신판매·정산 정보를 확인하세요."}
+            tone={seller.kycStatus === "APPROVED" ? "good" : "warn"}
+          />
+          <SellerQueueCard
+            label="상품 공개"
+            value={pendingReviewProducts > 0 ? `${pendingReviewProducts}개 검수` : rejectedProducts > 0 ? `${rejectedProducts}개 반려` : `${products.length}개`}
+            desc={pendingReviewProducts > 0 ? "관리자 승인 전까지 구매자에게 노출되지 않습니다." : rejectedProducts > 0 ? "반려 상품의 상세 정보를 보완하세요." : "공개 가능한 상품 상태를 유지하세요."}
+            tone={pendingReviewProducts || rejectedProducts ? "warn" : "good"}
+          />
+          <SellerQueueCard
+            label="배송 처리"
+            value={`${stats.pendingOrders || 0}건`}
+            desc={(stats.pendingOrders || 0) > 0 ? "주문 상세에서 송장 정보를 등록하세요." : "처리 대기 주문이 없습니다."}
+            tone={(stats.pendingOrders || 0) > 0 ? "warn" : "neutral"}
+          />
+          <SellerQueueCard
+            label="정산"
+            value={`${won(stats.pendingSettlement || 0)}원`}
+            desc={(stats.pendingSettlement || 0) > 0 ? "구매확정 이후 지급 상태를 확인하세요." : "지급 대기 정산이 없습니다."}
+            tone={(stats.pendingSettlement || 0) > 0 ? "good" : "neutral"}
+          />
         </div>
       </section>
 
@@ -842,6 +878,22 @@ function Stat({ label, value }) {
   );
 }
 
+function SellerQueueCard({ label, value, desc, tone = "neutral" }) {
+  const toneStyle = tone === "good"
+    ? styles.queueGood
+    : tone === "warn"
+      ? styles.queueWarn
+      : styles.queueNeutral;
+
+  return (
+    <div style={{ ...styles.queueCard, ...toneStyle }}>
+      <div style={styles.queueLabel}>{label}</div>
+      <div style={styles.queueValue}>{value}</div>
+      <div style={styles.queueDesc}>{desc}</div>
+    </div>
+  );
+}
+
 function Panel({ title, children }) {
   return (
     <div style={styles.panel}>
@@ -912,6 +964,14 @@ const styles = {
   sectionTitle: { marginBottom: 14 },
   sectionHeading: { margin: 0, fontSize: 17, fontWeight: 900, color: "var(--ink)", letterSpacing: 0 },
   sectionDesc: { margin: "5px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 },
+  workQueue: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  queueCard: { minHeight: 112, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
+  queueGood: { borderColor: "rgba(18, 122, 74, 0.22)", background: "rgba(18, 122, 74, 0.045)" },
+  queueWarn: { borderColor: "rgba(138, 90, 0, 0.24)", background: "rgba(138, 90, 0, 0.05)" },
+  queueNeutral: { borderColor: "var(--line)", background: "#fff" },
+  queueLabel: { fontSize: 10.5, fontWeight: 900, color: "var(--muted)", letterSpacing: "0.04em" },
+  queueValue: { marginTop: 7, fontSize: 18, fontWeight: 950, color: "var(--ink)", letterSpacing: 0 },
+  queueDesc: { marginTop: 6, fontSize: 11.5, lineHeight: 1.45, color: "var(--ink-soft)" },
   productTabs: { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 10 },
   productTab: {
     border: "1px solid var(--line)",
