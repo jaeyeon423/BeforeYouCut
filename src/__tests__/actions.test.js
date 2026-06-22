@@ -41,6 +41,7 @@ vi.mock("../utils/prisma", () => ({ prisma: mockPrisma, default: mockPrisma }));
 const {
   createInquiry,
   createOrder,
+  getMyAccountSummary,
   getMyShippingProfile,
   prepareCheckout,
   registerBuyer,
@@ -340,6 +341,59 @@ describe("shipping profile", () => {
       address: "서울시 강남구",
       addressDetail: "101동 202호",
     })).rejects.toThrow("로그인이 필요합니다.");
+  });
+});
+
+describe("account summary", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("게스트는 계정 요약을 반환하지 않는다", async () => {
+    mockGetUser.mockResolvedValue(noUser());
+
+    const result = await getMyAccountSummary();
+
+    expect(result).toBeNull();
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("로그인 사용자의 역할과 판매자 연결 상태를 반환한다", async () => {
+    const createdAt = new Date("2026-06-20T00:00:00.000Z");
+    mockGetUser.mockResolvedValue(authedUser("user-1", "seller@example.com", { name: "판매자" }));
+    mockPrisma.user.findUnique.mockResolvedValue({
+      email: "seller@example.com",
+      name: "판매자",
+      phone: "01012345678",
+      role: "SELLER",
+      createdAt,
+      seller: {
+        id: "steelgrain",
+        name: "STEEL & GRAIN",
+        verified: true,
+        isActive: true,
+        kycStatus: "APPROVED",
+        productsCount: 3,
+      },
+    });
+
+    const result = await getMyAccountSummary();
+
+    expect(result).toEqual({
+      email: "seller@example.com",
+      name: "판매자",
+      phone: "01012345678",
+      role: "SELLER",
+      isAdmin: false,
+      isSeller: true,
+      joinedAt: "2026. 6. 20.",
+      seller: {
+        id: "steelgrain",
+        name: "STEEL & GRAIN",
+        verified: true,
+        isActive: true,
+        kycStatus: "APPROVED",
+        productsCount: 3,
+      },
+    });
   });
 });
 

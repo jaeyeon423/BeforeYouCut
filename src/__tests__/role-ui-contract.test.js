@@ -31,4 +31,17 @@ describe("role-specific UI contracts", () => {
     expect(source).toContain("열린 환불 요청");
     expect(source).toContain("열린 고객 문의");
   });
+
+  it("my page keeps buyer stats separate from role switching", () => {
+    const pageSource = readSource("src/app/my/page.js");
+    const screenSource = readSource("src/components/screens/other.js");
+
+    expect(pageSource).toContain("getMyAccountSummary");
+    expect(screenSource).toContain("ROLE HUB");
+    expect(screenSource).toContain("역할별 화면");
+    expect(screenSource).toContain("구매자");
+    expect(screenSource).toContain("판매자 입점");
+    expect(screenSource).toContain("관리자 콘솔");
+    expect(screenSource).toContain("배송지");
+  });
 });

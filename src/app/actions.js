@@ -728,6 +728,58 @@ export async function getMyShippingProfile() {
   }
 }
 
+export async function getMyAccountSummary() {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: {
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            verified: true,
+            isActive: true,
+            kycStatus: true,
+            productsCount: true,
+          },
+        },
+      },
+    });
+
+    const role = user?.role || "BUYER";
+    return {
+      email: user?.email || authUser.email || "",
+      name: cleanText(user?.name) || cleanText(authUser.user_metadata?.name) || cleanText(authUser.email).split("@")[0] || "",
+      phone: cleanText(user?.phone) || cleanText(authUser.user_metadata?.phone),
+      role,
+      isAdmin: role === "ADMIN",
+      isSeller: role === "SELLER" || Boolean(user?.seller),
+      joinedAt: user?.createdAt ? formatDate(user.createdAt) : "",
+      seller: user?.seller
+        ? {
+            id: user.seller.id,
+            name: user.seller.name,
+            verified: user.seller.verified,
+            isActive: user.seller.isActive,
+            kycStatus: user.seller.kycStatus,
+            productsCount: user.seller.productsCount,
+          }
+        : null,
+    };
+  } catch (error) {
+    console.error("Failed to load account summary:", error);
+    return null;
+  }
+}
+
 export async function updateMyShippingProfile(input) {
   try {
     const authUser = await getAuthUser();

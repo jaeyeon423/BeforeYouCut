@@ -1,14 +1,15 @@
 import { TabHeader } from "@/components/nav";
 import { MyScreen } from "@/components/screens/other";
-import { getMyShippingProfile, getUserOrders } from "@/app/actions";
+import { getMyAccountSummary, getMyShippingProfile, getUserOrders } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyPage({ searchParams }) {
-  const [orders, params, shippingProfile] = await Promise.all([
+  const [orders, params, shippingProfile, accountSummary] = await Promise.all([
     getUserOrders(),
     searchParams,
     getMyShippingProfile(),
+    getMyAccountSummary(),
   ]);
   const initialAuthMode = ["signin", "signup"].includes(params?.auth) ? params.auth : null;
   const authReturnTo =
@@ -24,6 +25,7 @@ export default async function MyPage({ searchParams }) {
         initialAuthMode={initialAuthMode}
         authReturnTo={authReturnTo}
         shippingProfile={shippingProfile}
+        accountSummary={accountSummary}
       />
     </>
   );

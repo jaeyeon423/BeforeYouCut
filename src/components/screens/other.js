@@ -903,7 +903,26 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
 // ============================================================
 // MY PAGE & ONBOARDING
 // ============================================================
-export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = null, shippingProfile = null }) {
+function accountRoleLabel(role) {
+  const labels = {
+    ADMIN: "관리자",
+    SELLER: "판매자",
+    BUYER: "구매자",
+  };
+  return labels[role] || "구매자";
+}
+
+function accountKycLabel(status) {
+  const labels = {
+    DRAFT: "심사 정보 작성 전",
+    SUBMITTED: "심사 검토 대기",
+    APPROVED: "심사 승인",
+    REJECTED: "심사 반려",
+  };
+  return labels[status] || "입점 준비";
+}
+
+export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = null, shippingProfile = null, accountSummary = null }) {
   const router = useRouter();
   const { sellers, likes, showToast } = useApp();
   const { user, signOut } = useAuth();
@@ -928,6 +947,12 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const [shippingAddress, setShippingAddress] = useState(shippingProfile?.address || "");
   const [shippingAddressDetail, setShippingAddressDetail] = useState(shippingProfile?.addressDetail || "");
   const [shippingSaving, setShippingSaving] = useState(false);
+  const accountRole = accountSummary?.role || "BUYER";
+  const accountName = accountSummary?.name || user?.email?.split("@")[0] || "";
+  const roleLabel = accountRoleLabel(accountRole);
+  const sellerSummary = accountSummary?.seller || null;
+  const isAdmin = accountSummary?.isAdmin || accountRole === "ADMIN";
+  const savedShippingLabel = shippingAddress ? "저장" : "미등록";
   // 회원가입 약관 동의 상태
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentPrivacy, setConsentPrivacy] = useState(false);
@@ -1104,14 +1129,47 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
     }
   };
 
+  const openSellerCenter = () => {
+    if (!user) {
+      showToast("로그인이 필요한 서비스입니다.");
+      setAuthOpen("signin");
+      return;
+    }
+    router.push("/seller");
+  };
+
+  const openAdminConsole = () => {
+    if (!user) {
+      setAuthOpen("signin");
+      return;
+    }
+    if (!isAdmin) {
+      showToast("관리자 권한이 필요한 화면입니다.");
+      return;
+    }
+    router.push("/admin");
+  };
+
+  const menuItems = [
+    { label: "주문 내역", action: () => setHistoryOpen(true) },
+    { label: "저장한 도구", action: () => router.push("/saved") },
+    { label: "판매자 센터", action: openSellerCenter },
+    ...(isAdmin ? [{ label: "관리자 콘솔", action: openAdminConsole }] : []),
+    { label: "고객센터", action: () => {} },
+    { label: "설정", action: () => {
+      if (!user) { setAuthOpen("signin"); return; }
+      setSettingsOpen(true);
+    } },
+  ];
+
   return (
     <div className="byc-scroll fadein">
       {user ? (
         <div style={{ padding: "26px 18px 6px", display: "flex", alignItems: "center", gap: 14 }}>
           <div style={avatarBox}><Icon name="user" size={30} /></div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>{user.email.split('@')[0]} 님</div>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>일반회원 · {user.email}</div>
+            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>{accountName || user.email.split('@')[0]} 님</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>{roleLabel} 계정 · {accountSummary?.email || user.email}</div>
           </div>
           <button className="btn-ghost" style={{ padding: "6px 12px", fontSize: 11, background: "none", border: "1px solid var(--line)" }} onClick={handleSignOut}>로그아웃</button>
         </div>
@@ -1135,9 +1193,9 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         {[
           ["주문", String(orders.length), () => setHistoryOpen(true)],
           ["저장", String(likes.size), () => router.push("/saved")],
-          ["판매자", "센터", () => {
-            if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
-            router.push("/seller");
+          ["배송지", savedShippingLabel, () => {
+            if (!user) { setAuthOpen("signin"); return; }
+            setSettingsOpen(true);
           }],
         ].map(([l, v, action], i) => (
           <div key={l} onClick={action || undefined}
@@ -1180,30 +1238,37 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         </div>
       </div>
 
-      <div className="banner-promo" style={{ margin: "8px 18px 0", cursor: "pointer" }} onClick={() => {
-        if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
-        router.push("/seller");
-      }}>
-        <div className="bp-kicker">SELLER CENTER</div>
-        <div className="bp-title">판매자 센터로<br/>전환하기</div>
-        <div className="bp-sub">입점 신청, 상품 상세 구성, 주문·정산 관리는 판매자 전용 화면에서 진행합니다.</div>
-        <div className="bp-arrow"><Icon name="store" size={22} /></div>
+      <div className="account-role-hub">
+        <div className="account-role-head">
+          <div>
+            <div className="account-focus-kicker">ROLE HUB</div>
+            <h2>역할별 화면</h2>
+          </div>
+          <span>{user ? roleLabel : "게스트"}</span>
+        </div>
+        <div className="account-role-grid">
+          <button type="button" className="account-role-card active" onClick={() => setHistoryOpen(true)}>
+            <Icon name="bag" size={19} />
+            <b>구매자</b>
+            <span>{orders.length}건 주문 · {likes.size}개 저장</span>
+          </button>
+          <button type="button" className="account-role-card" onClick={openSellerCenter}>
+            <Icon name="store" size={19} />
+            <b>{sellerSummary ? "판매자 센터" : "판매자 입점"}</b>
+            <span>{sellerSummary ? `${sellerSummary.name} · ${accountKycLabel(sellerSummary.kycStatus)}` : "입점 신청, 상품, 주문, 정산 관리"}</span>
+          </button>
+          {isAdmin && (
+            <button type="button" className="account-role-card admin" onClick={openAdminConsole}>
+              <Icon name="lock" size={19} />
+              <b>관리자 콘솔</b>
+              <span>상품 검수, KYC, 환불, 정산, CS 처리</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: 24 }}>
-        {[
-          { label: "주문 내역", action: () => setHistoryOpen(true) },
-          { label: "판매자 센터", action: () => {
-            if (!user) { showToast("로그인이 필요한 서비스입니다."); return; }
-            router.push("/seller");
-          } },
-          { label: "저장한 도구", action: () => router.push("/saved") },
-          { label: "고객센터", action: () => {} },
-          { label: "설정", action: () => {
-            if (!user) { setAuthOpen("signin"); return; }
-            setSettingsOpen(true);
-          } },
-        ].map((item, i) => (
+        {menuItems.map((item, i) => (
           <div key={item.label} onClick={item.action}
             style={{ display: "flex", alignItems: "center", padding: "16px 18px", borderTop: i === 0 ? "1px solid var(--line)" : "none", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
             <span style={{ flex: 1, fontSize: 14, letterSpacing: "-0.02em" }}>{item.label}</span>

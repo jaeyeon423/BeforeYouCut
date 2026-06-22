@@ -161,6 +161,7 @@ Environment and secrets:
 - Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Buyer discovery screens now provide catalog context, filter/sort controls, search suggestions, product rails, and seller trust indicators so browsing feels like a shopping workflow rather than a static list.
 - Seller/admin role screens now emphasize operating cadence: seller center surfaces the next action plus product/compliance/order quick links, while admin console starts with a review/KYC/refund/CS runbook before the detailed queues.
+- `/my` is the role-switching account hub: buyer stats stay focused on orders/saved items/shipping address, while seller/admin entry cards are separated and driven by server-loaded DB role/account summary.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.
