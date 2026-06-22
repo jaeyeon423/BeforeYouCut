@@ -126,6 +126,21 @@ function SellerWorkspace({ dashboard }) {
   const pendingReviewProducts = products.filter((product) => product.reviewStatus === "PENDING").length;
   const rejectedProducts = products.filter((product) => product.reviewStatus === "REJECTED").length;
   const complianceIssueCount = compliance.issues?.length || 0;
+  const nextTask = getSellerNextTask({
+    seller,
+    products,
+    pendingReviewProducts,
+    rejectedProducts,
+    complianceIssueCount,
+    pendingOrders: stats.pendingOrders || 0,
+    pendingSettlement: stats.pendingSettlement || 0,
+  });
+  const quickActions = [
+    { href: "#seller-products", label: "상품 등록/수정", desc: products.length > 0 ? `${products.length}개 상품 관리` : "첫 상품 등록 필요" },
+    { href: "#seller-compliance", label: "운영 정보", desc: seller.kycStatus === "APPROVED" ? "심사 승인 상태" : `${complianceIssueCount}개 확인 필요` },
+    { href: "#seller-orders", label: "주문·정산", desc: `${stats.pendingOrders || 0}건 처리 대기` },
+    { href: `/sellers/${seller.id}`, label: "공개 페이지", desc: "구매자 노출 확인", external: true },
+  ];
 
   return (
     <div className="byc-scroll fadein">
@@ -147,6 +162,24 @@ function SellerWorkspace({ dashboard }) {
           <Stat label="누적 주문액" value={`${won(stats.totalSales || 0)}원`} />
           <Stat label="처리 주문" value={`${stats.pendingOrders || 0}건`} />
           <Stat label="예정 정산" value={`${won(stats.pendingSettlement || 0)}원`} />
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <div style={styles.nextPanel}>
+          <div style={styles.nextMain}>
+            <div style={styles.kicker}>NEXT ACTION</div>
+            <h2 style={styles.nextTitle}>{nextTask.title}</h2>
+            <p style={styles.nextDesc}>{nextTask.desc}</p>
+          </div>
+          <a href={nextTask.href} style={styles.nextButton}>{nextTask.action}</a>
+        </div>
+        <div style={styles.quickGrid}>
+          {quickActions.map((item) => (
+            item.external
+              ? <Link key={item.label} href={item.href} style={styles.quickAction}><b>{item.label}</b><span style={styles.quickActionDesc}>{item.desc}</span></Link>
+              : <a key={item.label} href={item.href} style={styles.quickAction}><b>{item.label}</b><span style={styles.quickActionDesc}>{item.desc}</span></a>
+          ))}
         </div>
       </section>
 
@@ -183,7 +216,7 @@ function SellerWorkspace({ dashboard }) {
         </div>
       </section>
 
-      <section style={styles.section}>
+      <section id="seller-products" style={styles.section}>
         <div style={styles.sectionHeaderRow}>
           <SectionTitle
             title="상품 상세페이지 구성"
@@ -231,7 +264,7 @@ function SellerWorkspace({ dashboard }) {
         )}
       </section>
 
-      <section style={styles.section}>
+      <section id="seller-compliance" style={styles.section}>
         <SectionTitle
           title="운영 정보"
           desc="입점 심사와 정산 지급에 필요한 정보를 실제 운영 기준으로 관리합니다."
@@ -239,7 +272,7 @@ function SellerWorkspace({ dashboard }) {
         <CompliancePanel seller={seller} bankAccount={bankAccount} compliance={compliance} documentLinks={documentLinks} />
       </section>
 
-      <section style={styles.section}>
+      <section id="seller-orders" style={styles.section}>
         <SectionTitle title="주문과 정산" desc="최근 주문과 정산 상태를 한 번에 확인합니다." />
         <div style={styles.opsGrid}>
           <Panel title="최근 주문">
@@ -279,6 +312,69 @@ function SellerWorkspace({ dashboard }) {
       </section>
     </div>
   );
+}
+
+function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedProducts, complianceIssueCount, pendingOrders, pendingSettlement }) {
+  if (complianceIssueCount > 0 || seller.kycStatus !== "APPROVED") {
+    return {
+      title: "운영 정보부터 보완",
+      desc: "입점 심사와 정산 계좌가 정리되어야 실제 판매 운영이 안정적으로 진행됩니다.",
+      action: "운영 정보 확인",
+      href: "#seller-compliance",
+    };
+  }
+
+  if (products.length === 0) {
+    return {
+      title: "첫 상품 등록",
+      desc: "상품명, 가격, 이미지, 상세 정보까지 입력해야 구매자 화면이 비어 보이지 않습니다.",
+      action: "상품 등록",
+      href: "#seller-products",
+    };
+  }
+
+  if (rejectedProducts > 0) {
+    return {
+      title: "반려 상품 보완",
+      desc: "관리자 검수에서 반려된 상품은 상세 정보와 필수 고시를 먼저 보완해야 합니다.",
+      action: "상품 수정",
+      href: "#seller-products",
+    };
+  }
+
+  if (pendingReviewProducts > 0) {
+    return {
+      title: "검수 대기 상품 확인",
+      desc: "승인 전 상품은 공개되지 않으므로 상세 미리보기와 필수 정보를 한 번 더 확인하세요.",
+      action: "상품 상태 보기",
+      href: "#seller-products",
+    };
+  }
+
+  if (pendingOrders > 0) {
+    return {
+      title: "배송 처리",
+      desc: "처리 대기 주문은 주문 상세에서 송장 정보를 등록해 구매자 불안을 줄여야 합니다.",
+      action: "주문 확인",
+      href: "#seller-orders",
+    };
+  }
+
+  if (pendingSettlement > 0) {
+    return {
+      title: "정산 상태 확인",
+      desc: "구매확정 이후 정산 예정 금액과 지급 상태를 확인하세요.",
+      action: "정산 확인",
+      href: "#seller-orders",
+    };
+  }
+
+  return {
+    title: "공개 페이지 점검",
+    desc: "구매자가 보는 브랜드 설명, 상품 카드, 상세페이지를 주기적으로 확인합니다.",
+    action: "상품 관리",
+    href: "#seller-products",
+  };
 }
 
 function NewProductForm({ seller, onCreated }) {
@@ -990,6 +1086,14 @@ const styles = {
   sectionTitle: { marginBottom: 14 },
   sectionHeading: { margin: 0, fontSize: 17, fontWeight: 900, color: "var(--ink)", letterSpacing: 0 },
   sectionDesc: { margin: "5px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 },
+  nextPanel: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 13 },
+  nextMain: { flex: 1, minWidth: 0 },
+  nextTitle: { margin: "4px 0 5px", fontSize: 17, fontWeight: 950, color: "var(--ink)", letterSpacing: 0 },
+  nextDesc: { margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--ink-soft)" },
+  nextButton: { flexShrink: 0, border: "1px solid var(--ink)", borderRadius: 6, background: "var(--ink)", color: "#fff", padding: "9px 11px", fontSize: 12, fontWeight: 900, textDecoration: "none" },
+  quickGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 9 },
+  quickAction: { display: "flex", flexDirection: "column", gap: 4, border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)", padding: 11, color: "inherit", textDecoration: "none" },
+  quickActionDesc: { fontSize: 11, color: "var(--muted)" },
   workQueue: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
   queueCard: { minHeight: 112, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
   queueGood: { borderColor: "rgba(18, 122, 74, 0.22)", background: "rgba(18, 122, 74, 0.045)" },

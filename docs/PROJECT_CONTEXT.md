@@ -160,6 +160,7 @@ Environment and secrets:
 - Role-specific UI composition is the product direction: buyer home/my-page surface shopping trust and account state first, seller center starts with daily operation queues, and admin console starts with risk/review queues before detailed lists.
 - Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Buyer discovery screens now provide catalog context, filter/sort controls, search suggestions, product rails, and seller trust indicators so browsing feels like a shopping workflow rather than a static list.
+- Seller/admin role screens now emphasize operating cadence: seller center surfaces the next action plus product/compliance/order quick links, while admin console starts with a review/KYC/refund/CS runbook before the detailed queues.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.
@@ -170,7 +171,7 @@ Environment and secrets:
 - Public service name is now `미용사` with `MIYONGSA` as the wordmark style. Fake public business values must not be displayed; use `src/site.config.js` and hide unknown legal values until the user provides real ones.
 - `docs/launch-gap-review.md` tracks Musinsa benchmark gaps and the remaining launch implementation order.
 - Admin console lives at `/admin`; external PG refund execution, PG webhook hardening, bank payout automation, and carrier tracking automation still need follow-up implementation.
-- Latest pushed commit as of 2026-06-18: `5c3a7d8 판매자 센터와 출시 체크리스트 추가`.
+- Check the current pushed commit with `git log -1 --oneline`; this file intentionally avoids hardcoding a moving commit hash.
 
 ## Known Gaps
 

@@ -100,6 +100,40 @@ export default function AdminDashboardScreen({ dashboard }) {
 
 function AdminWorkspace({ dashboard }) {
   const { stats, sellers = [], products = [], orders = [], refunds = [], settlements = [], inquiries = [], options = {} } = dashboard;
+  const openInquiries = stats.openInquiries || 0;
+  const openRefunds = stats.openRefunds || 0;
+  const pendingProducts = stats.pendingProducts || 0;
+  const pendingKyc = stats.pendingKyc || 0;
+  const urgentWorkCount = pendingProducts + pendingKyc + openRefunds + openInquiries;
+  const runbook = [
+    {
+      href: "#admin-products",
+      title: "상품 검수",
+      desc: "미승인 상품은 구매자에게 노출되지 않으므로 이미지, 가격, 상세 정보부터 확인합니다.",
+      value: `${pendingProducts}개`,
+      active: pendingProducts > 0,
+    },
+    {
+      href: "#admin-sellers",
+      title: "판매자 KYC",
+      desc: "사업자 정보, 통신판매 신고, 정산 계좌가 운영 가능한 상태인지 확인합니다.",
+      value: `${pendingKyc}곳`,
+      active: pendingKyc > 0,
+    },
+    {
+      href: "#admin-risk",
+      title: "환불·CS",
+      desc: "결제 이후 분쟁과 문의를 먼저 닫아 구매자 신뢰를 유지합니다.",
+      value: `${openRefunds + openInquiries}건`,
+      active: openRefunds + openInquiries > 0,
+    },
+  ];
+  const riskRows = [
+    { label: "상품 노출 전 검수", value: `${pendingProducts}개`, href: "#admin-products", active: pendingProducts > 0 },
+    { label: "입점/KYC 검토", value: `${pendingKyc}곳`, href: "#admin-sellers", active: pendingKyc > 0 },
+    { label: "열린 환불 요청", value: `${openRefunds}건`, href: "#admin-risk", active: openRefunds > 0 },
+    { label: "열린 고객 문의", value: `${openInquiries}건`, href: "#admin-risk", active: openInquiries > 0 },
+  ];
 
   return (
     <div className="byc-scroll fadein">
@@ -112,6 +146,26 @@ function AdminWorkspace({ dashboard }) {
           <Stat label="KYC 대기" value={`${stats.pendingKyc || 0}곳`} />
           <Stat label="환불 요청" value={`${stats.openRefunds || 0}건`} />
           <Stat label="예정 정산" value={`${won(stats.pendingSettlement || 0)}원`} />
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <div style={styles.controlPanel}>
+          <div style={styles.controlHead}>
+            <div>
+              <h2 style={styles.sectionTitle}>오늘 처리 기준</h2>
+              <p style={styles.sectionDesc}>구매자 노출, 판매자 검증, 결제 이후 리스크 순서로 처리합니다.</p>
+            </div>
+            <Pill>{urgentWorkCount > 0 ? `대기 ${urgentWorkCount}건` : "대기 없음"}</Pill>
+          </div>
+          <div style={styles.runbookList}>
+            {runbook.map((item, index) => (
+              <RunbookStep key={item.title} step={index + 1} {...item} />
+            ))}
+          </div>
+          <div style={styles.riskGrid}>
+            {riskRows.map((item) => <RiskChip key={item.label} {...item} />)}
+          </div>
         </div>
       </section>
 
@@ -484,6 +538,28 @@ function CommandCard({ href, label, value, desc, urgent }) {
   );
 }
 
+function RunbookStep({ step, href, title, desc, value, active }) {
+  return (
+    <a href={href} style={active ? { ...styles.runbookStep, ...styles.runbookStepActive } : styles.runbookStep}>
+      <span style={styles.runbookNumber}>{step}</span>
+      <span style={styles.runbookMain}>
+        <b style={styles.runbookTitle}>{title}</b>
+        <span style={styles.runbookDesc}>{desc}</span>
+      </span>
+      <span style={styles.runbookValue}>{value}</span>
+    </a>
+  );
+}
+
+function RiskChip({ label, value, href, active }) {
+  return (
+    <a href={href} style={active ? { ...styles.riskChip, ...styles.riskChipActive } : styles.riskChip}>
+      <span style={styles.riskLabel}>{label}</span>
+      <b style={styles.riskValue}>{value}</b>
+    </a>
+  );
+}
+
 function MiniPanel({ title, children }) {
   return (
     <div style={styles.miniPanel}>
@@ -556,6 +632,21 @@ const styles = {
   sectionTitle: { margin: 0, fontSize: 17, fontWeight: 900, letterSpacing: 0, color: "var(--ink)" },
   sectionCount: { flexShrink: 0, border: "1px solid var(--line)", borderRadius: 999, background: "var(--surface)", padding: "4px 8px", fontSize: 11, fontWeight: 900, color: "var(--muted)" },
   sectionDesc: { margin: "5px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 },
+  controlPanel: { border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
+  controlHead: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
+  runbookList: { display: "flex", flexDirection: "column", gap: 8, marginTop: 13 },
+  runbookStep: { display: "grid", gridTemplateColumns: "28px 1fr auto", gap: 10, alignItems: "center", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)", padding: 10, color: "inherit", textDecoration: "none" },
+  runbookStepActive: { borderColor: "rgba(138, 90, 0, 0.28)", background: "rgba(138, 90, 0, 0.05)" },
+  runbookNumber: { width: 24, height: 24, borderRadius: 999, display: "grid", placeItems: "center", background: "#fff", border: "1px solid var(--line)", fontSize: 11, fontWeight: 900, color: "var(--ink)" },
+  runbookMain: { minWidth: 0, display: "flex", flexDirection: "column", gap: 3 },
+  runbookTitle: { fontSize: 12.5, color: "var(--ink)" },
+  runbookDesc: { fontSize: 11.5, lineHeight: 1.4, color: "var(--ink-soft)" },
+  runbookValue: { fontSize: 12, fontWeight: 900, color: "var(--ink)", whiteSpace: "nowrap" },
+  riskGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 },
+  riskChip: { border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)", padding: 10, color: "inherit", textDecoration: "none" },
+  riskChipActive: { borderColor: "rgba(161, 43, 43, 0.24)", background: "rgba(161, 43, 43, 0.045)" },
+  riskLabel: { display: "block", fontSize: 10.5, fontWeight: 800, color: "var(--muted)" },
+  riskValue: { display: "block", marginTop: 5, fontSize: 15, color: "var(--ink)" },
   commandGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
   commandCard: { display: "block", minHeight: 104, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12, textDecoration: "none", color: "inherit" },
   commandCardUrgent: { borderColor: "rgba(138, 90, 0, 0.28)", background: "rgba(138, 90, 0, 0.05)" },
