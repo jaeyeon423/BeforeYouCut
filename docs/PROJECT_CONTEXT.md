@@ -152,6 +152,7 @@ Environment and secrets:
 - Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget, and unit/floor details are captured in a separate detail-address field before being composed into the final order address.
 - Signup uses a shopping-mall style flow in `/my`: buyer name/phone, SMS OTP verification, email/password, required terms. `registerBuyer` performs final server-side signup only after `PhoneVerification` is verified.
 - SMS OTP uses NAVER Cloud SENS when `NAVER_SENS_*` env vars are configured; local/test environments return/log a debug code instead.
+- Future mobile expansion is planned as a Flutter buyer-only app that calls `/api/v1/*`; keep seller/admin web-only for now and move shared business logic into `src/server/services/*` before exposing API routes.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.
@@ -186,6 +187,7 @@ Environment and secrets:
 - `TODO.md`: small pending operational items, currently focused on Sentry setup.
 - `docs/ai-human-launch-checklist.md`: AI-vs-human launch checklist from the business setup task.
 - `docs/production-roadmap-prompts.md`: roadmap prompts and product planning notes.
+- `docs/flutter-buyer-app-api-design.md`: Flutter buyer app and `/api/v1` API layer design. Use before adding app-facing APIs or mobile-specific service extraction.
 
 ## Standard Verification
 
