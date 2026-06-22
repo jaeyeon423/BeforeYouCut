@@ -50,7 +50,8 @@ Known non-blocking warnings:
 
 Use `rg` first. Avoid broad scans unless the task is architectural.
 
-- `src/app/actions.js`: all main Server Actions, cached data loaders, auth-scoped mutations, seller dashboard actions.
+- `src/app/actions.js`: all main Server Actions, cached public loader wrappers, auth-scoped mutations, seller dashboard actions.
+- `src/server/services/catalog-service.js`: public catalog query conditions, product/seller formatters, and marketplace read services shared by web loaders and future app-facing APIs.
 - `prisma/schema.prisma`: authoritative data model.
 - `src/site.config.js`: public business info, service metadata, seller policy, commission and legal retention settings. No secrets here.
 - `src/app/layout.js`: root providers and seller map preload.
@@ -133,6 +134,7 @@ Environment and secrets:
 - `.env*` files are ignored. Never commit secrets.
 - `.env.example` documents expected variables.
 - Vercel production variables must be configured in the Vercel dashboard.
+- Database TLS certificate verification defaults on for `VERCEL_ENV=production`; local/non-production builds can override with `DATABASE_TLS_REJECT_UNAUTHORIZED`.
 
 ## Recent Decisions
 
@@ -153,6 +155,7 @@ Environment and secrets:
 - Signup uses a shopping-mall style flow in `/my`: buyer name/phone, SMS OTP verification, email/password, required terms. `registerBuyer` performs final server-side signup only after `PhoneVerification` is verified.
 - SMS OTP uses NAVER Cloud SENS when `NAVER_SENS_*` env vars are configured; local/test environments return/log a debug code instead.
 - Future mobile expansion is planned as a Flutter buyer-only app that calls `/api/v1/*`; keep seller/admin web-only for now and move shared business logic into `src/server/services/*` before exposing API routes.
+- Public catalog read logic has started moving into `src/server/services/*`: `actions.js` keeps the Next.js cache/action boundary, while `src/server/services/catalog-service.js` owns product/seller public query rules and formatting.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.

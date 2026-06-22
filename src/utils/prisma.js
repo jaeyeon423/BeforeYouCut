@@ -2,10 +2,9 @@ import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
-// In non-production environments, we bypass unauthorized TLS check to allow connections
-// to Supabase/PostgreSQL via local development environments where TLS certificates might be
-// self-signed or missing. This setting is strictly restricted to development/testing
-// and will never execute in production where proper TLS is enforced by default.
+// DATABASE_TLS_REJECT_UNAUTHORIZED can force TLS certificate verification on/off.
+// By default, Vercel production verifies certificates; local and non-production
+// builds keep the Supabase development bypass for self-signed certificate chains.
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -16,6 +15,17 @@ const connectionString =
   "postgresql://placeholder:placeholder@localhost:5432/placeholder?sslmode=disable";
 
 let realPrisma = null;
+
+function parseBooleanEnv(value) {
+  if (value === undefined) return null;
+  return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
+}
+
+function shouldRejectDatabaseTlsUnauthorized() {
+  const override = parseBooleanEnv(process.env.DATABASE_TLS_REJECT_UNAUTHORIZED);
+  if (override !== null) return override;
+  return process.env.VERCEL_ENV === 'production';
+}
 
 const createPrismaClient = () => {
   if (!process.env.DATABASE_URL && !process.env.POSTGRES_PRISMA_URL && !process.env.POSTGRES_URL && !process.env.DIRECT_URL && !process.env.POSTGRES_URL_NON_POOLING) {
@@ -34,11 +44,13 @@ const createPrismaClient = () => {
     console.error("Failed to parse database connection URL:", e);
   }
   
+  const rejectUnauthorized = shouldRejectDatabaseTlsUnauthorized();
+
   const pool = new Pool({
     connectionString: cleanUrl,
     max: 4, // Prevent connection exhaustion on Supabase Free Plan
     ssl: {
-      rejectUnauthorized: false,
+      rejectUnauthorized,
     },
   });
   
