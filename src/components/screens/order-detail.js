@@ -24,6 +24,100 @@ function getOrderStepIndex(status) {
   return index >= 0 ? index : 0;
 }
 
+function getOrderRoleCopy(role) {
+  if (role === "seller") {
+    return {
+      kicker: "SELLER ORDER",
+      title: "판매 주문 처리",
+      desc: "구매자에게 보이는 배송 상태를 정확히 관리하고, 구매확정 이후 정산 흐름을 확인합니다.",
+    };
+  }
+  if (role === "admin") {
+    return {
+      kicker: "ADMIN ORDER",
+      title: "운영 주문 검토",
+      desc: "배송 지연, 환불 요청, 상태 불일치 같은 운영 리스크를 기준으로 주문을 확인합니다.",
+    };
+  }
+  return {
+    kicker: "BUYER ORDER",
+    title: "주문 상세",
+    desc: "주문 상품, 배송 진행, 반품·환불 가능 상태를 한 화면에서 확인합니다.",
+  };
+}
+
+function getOrderRoleTasks(role, order) {
+  const shipmentValue = order.shipment?.trackingNo ? "송장 등록" : "등록 전";
+  const refundValue = order.refundRequest?.status || (order.canRequestRefund ? "신청 가능" : "접수 없음");
+
+  if (role === "seller") {
+    return [
+      {
+        icon: "ship",
+        label: "배송 처리",
+        value: order.canUpdateShipment ? shipmentValue : "처리 종료",
+        desc: order.canUpdateShipment ? "송장 등록 시 주문 상태가 배송중으로 전환됩니다." : "현재 상태에서는 송장 변경이 제한됩니다.",
+      },
+      {
+        icon: "user",
+        label: "구매자 정보",
+        value: order.buyer,
+        desc: order.phone ? `연락처 ${order.phone}` : "연락처 정보가 없습니다.",
+      },
+      {
+        icon: "check",
+        label: "정산 기준",
+        value: `${won(order.total)}원`,
+        desc: "구매확정 이후 정산 확정 단계로 이동합니다.",
+      },
+    ];
+  }
+
+  if (role === "admin") {
+    return [
+      {
+        icon: "lock",
+        label: "운영 상태",
+        value: order.status,
+        desc: "주문 상태와 배송/환불 기록이 일치하는지 확인합니다.",
+      },
+      {
+        icon: "ship",
+        label: "배송 증빙",
+        value: shipmentValue,
+        desc: order.shipment?.carrier || "판매자 송장 등록 전입니다.",
+      },
+      {
+        icon: "bell",
+        label: "환불 리스크",
+        value: refundValue,
+        desc: order.refundRequest ? "관리자 콘솔에서 환불 처리 상태를 이어서 관리합니다." : "접수된 환불 요청이 없습니다.",
+      },
+    ];
+  }
+
+  return [
+    {
+      icon: "bag",
+      label: "주문 상태",
+      value: order.status,
+      desc: "결제 이후 배송 단계와 구매확정 상태를 확인합니다.",
+    },
+    {
+      icon: "ship",
+      label: "배송",
+      value: shipmentValue,
+      desc: order.shipment?.carrier ? `${order.shipment.carrier} ${order.shipment.trackingNo}` : "판매자가 송장을 등록하면 이곳에 표시됩니다.",
+    },
+    {
+      icon: "bell",
+      label: "반품·환불",
+      value: refundValue,
+      desc: order.canRequestRefund ? "현재 상태에서 반품·환불 신청이 가능합니다." : "신청 가능 상태가 아니거나 이미 접수되었습니다.",
+    },
+  ];
+}
+
 export default function OrderDetailScreen({ data }) {
   if (data.status === "guest") {
     return <StatePanel icon="user" title="로그인이 필요합니다" desc="주문 상세는 주문자 또는 판매자 계정으로 로그인 후 확인할 수 있습니다." href="/my" action="로그인하러 가기" />;
@@ -50,6 +144,8 @@ function OrderWorkspace({ order, role }) {
   const [isPending, startTransition] = useTransition();
   const returnHref = role === "seller" ? "/seller" : role === "admin" ? "/admin" : "/my";
   const activeStep = getOrderStepIndex(order.status);
+  const roleCopy = getOrderRoleCopy(role);
+  const roleTasks = getOrderRoleTasks(role, order);
 
   const submitShipment = (event) => {
     event.preventDefault();
@@ -84,15 +180,25 @@ function OrderWorkspace({ order, role }) {
       <section style={styles.hero}>
         <div style={styles.heroTop}>
           <div>
-            <div style={styles.kicker}>ORDER</div>
-            <h1 style={styles.title}>#{order.id.slice(0, 8)}</h1>
-            <div style={styles.meta}>{order.date}</div>
+            <div style={styles.kicker}>{roleCopy.kicker}</div>
+            <h1 style={styles.title}>{roleCopy.title}</h1>
+            <div style={styles.meta}>#{order.id.slice(0, 8)} · {order.date}</div>
           </div>
           <StatusPill>{order.status}</StatusPill>
         </div>
+        <p style={styles.heroDesc}>{roleCopy.desc}</p>
         <div style={styles.summaryGrid}>
           <Summary label="주문금액" value={`${won(order.total)}원`} />
           <Summary label="상품수" value={`${order.items.length}개`} />
+        </div>
+        <div style={styles.rolePanel}>
+          <div style={styles.rolePanelHead}>
+            <span>{role === "admin" ? "운영 체크" : role === "seller" ? "판매 처리" : "구매 확인"}</span>
+            <b>{role === "admin" ? "관리자" : role === "seller" ? "판매자" : "구매자"}</b>
+          </div>
+          <div style={styles.roleTaskGrid}>
+            {roleTasks.map((task) => <RoleTaskCard key={task.label} task={task} />)}
+          </div>
         </div>
         <div style={styles.progressPanel}>
           <div style={styles.progressHead}>
@@ -239,6 +345,19 @@ function InfoRow({ label, value }) {
   );
 }
 
+function RoleTaskCard({ task }) {
+  return (
+    <div style={styles.roleTask}>
+      <Icon name={task.icon} size={17} />
+      <div style={styles.roleTaskMain}>
+        <span style={styles.roleTaskLabel}>{task.label}</span>
+        <b style={styles.roleTaskValue}>{task.value}</b>
+        <span style={styles.roleTaskDesc}>{task.desc}</span>
+      </div>
+    </div>
+  );
+}
+
 function StatusPill({ children }) {
   return <span style={styles.statusPill}>{children}</span>;
 }
@@ -268,10 +387,19 @@ const styles = {
   kicker: { fontSize: 10, fontWeight: 900, color: "var(--muted)", letterSpacing: "0.08em" },
   title: { margin: "4px 0", fontSize: 22, color: "var(--ink)", letterSpacing: 0 },
   meta: { fontSize: 12, color: "var(--muted)" },
+  heroDesc: { margin: "10px 0 0", fontSize: 12.5, lineHeight: 1.55, color: "var(--ink-soft)" },
   summaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 },
   summary: { background: "#fff", border: "1px solid var(--line)", borderRadius: 6, padding: "12px 10px" },
   summaryValue: { fontSize: 15, fontWeight: 900, color: "var(--ink)" },
   summaryLabel: { marginTop: 3, fontSize: 11, color: "var(--muted)" },
+  rolePanel: { marginTop: 12, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
+  rolePanelHead: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", fontSize: 12, color: "var(--muted)", fontWeight: 800 },
+  roleTaskGrid: { display: "grid", gridTemplateColumns: "1fr", gap: 8, marginTop: 10 },
+  roleTask: { display: "grid", gridTemplateColumns: "22px 1fr", gap: 9, alignItems: "flex-start", border: "1px solid var(--line)", borderRadius: 8, background: "var(--surface)", padding: 10 },
+  roleTaskMain: { minWidth: 0 },
+  roleTaskLabel: { display: "block", fontSize: 10.5, fontWeight: 900, color: "var(--muted)" },
+  roleTaskValue: { display: "block", marginTop: 3, fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  roleTaskDesc: { display: "block", marginTop: 4, fontSize: 11.5, lineHeight: 1.45, color: "var(--ink-soft)" },
   progressPanel: { marginTop: 12, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
   progressHead: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "var(--muted)", fontWeight: 800 },
   stepTrack: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4, marginTop: 12 },

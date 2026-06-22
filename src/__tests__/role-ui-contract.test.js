@@ -44,4 +44,17 @@ describe("role-specific UI contracts", () => {
     expect(screenSource).toContain("관리자 콘솔");
     expect(screenSource).toContain("배송지");
   });
+
+  it("order detail keeps role-specific buyer seller admin framing", () => {
+    const source = readSource("src/components/screens/order-detail.js");
+
+    expect(source).toContain("getOrderRoleCopy");
+    expect(source).toContain("getOrderRoleTasks");
+    expect(source).toContain("BUYER ORDER");
+    expect(source).toContain("SELLER ORDER");
+    expect(source).toContain("ADMIN ORDER");
+    expect(source).toContain("판매 주문 처리");
+    expect(source).toContain("운영 주문 검토");
+    expect(source).toContain("환불 리스크");
+  });
 });
