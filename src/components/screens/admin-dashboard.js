@@ -128,25 +128,25 @@ function AdminWorkspace({ dashboard }) {
         </div>
       </section>
 
-      <AdminSection id="admin-products" title="상품 검수" desc="승인된 상품만 구매자 화면에 노출됩니다.">
+      <AdminSection id="admin-products" title="상품 검수" count={products.length} desc="승인된 상품만 구매자 화면에 노출됩니다.">
         {products.length > 0 ? products.map((product) => (
           <ProductReviewRow key={product.id} product={product} />
         )) : <Empty text="검수할 상품이 없습니다." />}
       </AdminSection>
 
-      <AdminSection id="admin-sellers" title="판매자 승인" desc="검증·노출 상태를 관리합니다.">
+      <AdminSection id="admin-sellers" title="판매자 승인" count={sellers.length} desc="검증·노출 상태를 관리합니다.">
         {sellers.length > 0 ? sellers.map((seller) => (
           <SellerReviewRow key={seller.id} seller={seller} />
         )) : <Empty text="등록된 판매자가 없습니다." />}
       </AdminSection>
 
-      <AdminSection id="admin-orders" title="주문 관리" desc="배송, 반품, 환불 상태를 운영자가 조정합니다.">
+      <AdminSection id="admin-orders" title="주문 관리" count={orders.length} desc="배송, 반품, 환불 상태를 운영자가 조정합니다.">
         {orders.length > 0 ? orders.map((order) => (
           <OrderRow key={order.id} order={order} statuses={options.orderStatuses || []} />
         )) : <Empty text="주문 내역이 없습니다." />}
       </AdminSection>
 
-      <AdminSection id="admin-risk" title="환불·정산·CS" desc="운영 리스크가 있는 항목을 빠르게 확인합니다.">
+      <AdminSection id="admin-risk" title="환불·정산·CS" count={refunds.length + settlements.length + inquiries.length} desc="운영 리스크가 있는 항목을 빠르게 확인합니다.">
         <MiniPanel title="환불 요청">
           {refunds.length > 0 ? refunds.slice(0, 8).map((refund) => (
             <RefundRow key={refund.id} refund={refund} />
@@ -456,11 +456,14 @@ function InquiryRow({ inquiry }) {
   );
 }
 
-function AdminSection({ id, title, desc, children }) {
+function AdminSection({ id, title, count, desc, children }) {
   return (
     <section id={id} style={styles.section}>
       <div style={styles.sectionHead}>
-        <h2 style={styles.sectionTitle}>{title}</h2>
+        <div style={styles.sectionTitleRow}>
+          <h2 style={styles.sectionTitle}>{title}</h2>
+          {Number.isFinite(count) && <span style={styles.sectionCount}>{count}건</span>}
+        </div>
         {desc && <p style={styles.sectionDesc}>{desc}</p>}
       </div>
       <div style={styles.stack}>{children}</div>
@@ -549,7 +552,9 @@ const styles = {
   statLabel: { marginTop: 3, fontSize: 10.5, color: "var(--muted)" },
   section: { padding: "22px 18px 0" },
   sectionHead: { marginBottom: 12 },
+  sectionTitleRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
   sectionTitle: { margin: 0, fontSize: 17, fontWeight: 900, letterSpacing: 0, color: "var(--ink)" },
+  sectionCount: { flexShrink: 0, border: "1px solid var(--line)", borderRadius: 999, background: "var(--surface)", padding: "4px 8px", fontSize: 11, fontWeight: 900, color: "var(--muted)" },
   sectionDesc: { margin: "5px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 },
   commandGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
   commandCard: { display: "block", minHeight: 104, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12, textDecoration: "none", color: "inherit" },

@@ -343,6 +343,21 @@ export function DetailScreen({ product: p, seller, related = [] }) {
               <Icon name="store" size={17} /> 브랜드 보기
             </Link>
           </div>
+          <div className="pd-decision-panel">
+            <div className="pd-decision-row">
+              <span>판매자</span>
+              <b>{s.verified ? "검증 완료" : "입점 판매자"}</b>
+            </div>
+            <div className="pd-decision-row">
+              <span>배송</span>
+              <b>평균 2영업일 출고</b>
+            </div>
+            <div className="pd-decision-row">
+              <span>교환/반품</span>
+              <b>수령 후 7일 이내 신청</b>
+            </div>
+            <div className="pd-decision-note">결제는 PG 승인 후 주문으로 확정되며, 판매자와 상품 정보는 주문 상세에서 다시 확인할 수 있습니다.</div>
+          </div>
         </div>
 
         <div className="pd-divider" />
@@ -696,6 +711,18 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
             </div>
           )}
         </div>
+        {items.length > 0 && (
+          <div className="cart-summary-card">
+            <div className="cart-summary-head">
+              <b>주문 요약</b>
+              <span>{items.length}개 상품</span>
+            </div>
+            <div className="cart-summary-line"><span>상품 금액</span><b>{won(total)}원</b></div>
+            <div className="cart-summary-line"><span>배송비</span><b>판매자 정책 확인</b></div>
+            <div className="cart-summary-total"><span>결제 예정 금액</span><b>{won(total)}원</b></div>
+            <div className="cart-summary-note">주문자 정보와 배송지를 확인한 뒤 토스페이먼츠 결제창에서 최종 결제 수단을 선택합니다.</div>
+          </div>
+        )}
         <Foot />
       </div>
       {items.length > 0 && (
@@ -710,6 +737,17 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
       {checkoutOpen && (
         <ModalSheet title="주문 / 결제하기" onClose={() => !loading && setCheckoutOpen(false)} maxHeight="85%">
           <form onSubmit={handleCheckoutSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="checkout-sheet-block">
+              <label style={sheetLabel}>주문 상품</label>
+              <div className="checkout-line-list">
+                {items.map((item, index) => (
+                  <div className="checkout-line" key={`${item.id}-${index}`}>
+                    <span>{item.name}</span>
+                    <b>{won(item.price)}원</b>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div>
               <label style={sheetLabel}>주문자 정보</label>
               <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
@@ -759,6 +797,9 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
                 <span style={{ fontSize: 13, color: "var(--ink-soft)", fontWeight: 600 }}>총 결제 금액</span>
                 <span style={{ fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{won(total)}원</span>
+              </div>
+              <div className="checkout-agreement-note">
+                주문 내용을 확인했으며 결제 진행 시 PG 승인 결과에 따라 주문이 확정됩니다.
               </div>
               <button className="buy" type="submit" style={{ width: "100%" }} disabled={loading}>
                 {loading ? "결제창 준비 중..." : "결제창 열기"}

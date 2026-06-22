@@ -158,6 +158,7 @@ Environment and secrets:
 - Future mobile expansion is planned as a Flutter buyer-only app that calls `/api/v1/*`; keep seller/admin web-only for now and move shared business logic into `src/server/services/*` before exposing API routes.
 - Public catalog read logic has started moving into `src/server/services/*`: `actions.js` keeps the Next.js cache/action boundary, while `src/server/services/catalog-service.js` owns product/seller public query rules and formatting.
 - Role-specific UI composition is the product direction: buyer home/my-page surface shopping trust and account state first, seller center starts with daily operation queues, and admin console starts with risk/review queues before detailed lists.
+- Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.
 - Seller center now captures KYC/business fields, private `seller-documents` storage paths or fallback document URLs, and encrypted settlement account data. Admin can review KYC status, open signed document URLs, mark settlement accounts verified, and see missing compliance issues.

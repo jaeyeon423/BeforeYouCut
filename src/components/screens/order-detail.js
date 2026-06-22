@@ -16,6 +16,13 @@ const REFUND_REASONS = [
 ];
 
 const REFUND_REASON_LABEL = Object.fromEntries(REFUND_REASONS);
+const ORDER_STEPS = ["결제완료", "배송 준비중", "배송중", "배송완료", "구매확정"];
+
+function getOrderStepIndex(status) {
+  if (["취소", "환불완료", "반품"].includes(status)) return -1;
+  const index = ORDER_STEPS.indexOf(status);
+  return index >= 0 ? index : 0;
+}
 
 export default function OrderDetailScreen({ data }) {
   if (data.status === "guest") {
@@ -42,6 +49,7 @@ function OrderWorkspace({ order, role }) {
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const returnHref = role === "seller" ? "/seller" : role === "admin" ? "/admin" : "/my";
+  const activeStep = getOrderStepIndex(order.status);
 
   const submitShipment = (event) => {
     event.preventDefault();
@@ -85,6 +93,24 @@ function OrderWorkspace({ order, role }) {
         <div style={styles.summaryGrid}>
           <Summary label="주문금액" value={`${won(order.total)}원`} />
           <Summary label="상품수" value={`${order.items.length}개`} />
+        </div>
+        <div style={styles.progressPanel}>
+          <div style={styles.progressHead}>
+            <span>주문 진행</span>
+            <b>{order.status}</b>
+          </div>
+          <div style={styles.stepTrack}>
+            {ORDER_STEPS.map((step, index) => {
+              const active = activeStep >= index;
+              return (
+                <div key={step} style={styles.stepItem}>
+                  <span style={active ? { ...styles.stepDot, ...styles.stepDotActive } : styles.stepDot} />
+                  <span style={active ? { ...styles.stepText, ...styles.stepTextActive } : styles.stepText}>{step}</span>
+                </div>
+              );
+            })}
+          </div>
+          {activeStep < 0 && <div style={styles.exceptionText}>현재 주문은 일반 배송 진행 단계가 아닌 {order.status} 상태입니다.</div>}
         </div>
       </section>
 
@@ -246,6 +272,15 @@ const styles = {
   summary: { background: "#fff", border: "1px solid var(--line)", borderRadius: 6, padding: "12px 10px" },
   summaryValue: { fontSize: 15, fontWeight: 900, color: "var(--ink)" },
   summaryLabel: { marginTop: 3, fontSize: 11, color: "var(--muted)" },
+  progressPanel: { marginTop: 12, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
+  progressHead: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "var(--muted)", fontWeight: 800 },
+  stepTrack: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4, marginTop: 12 },
+  stepItem: { minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 },
+  stepDot: { width: 9, height: 9, borderRadius: 999, background: "var(--line-strong)" },
+  stepDotActive: { background: "var(--ink)" },
+  stepText: { fontSize: 10, color: "var(--muted)", textAlign: "center", lineHeight: 1.25 },
+  stepTextActive: { color: "var(--ink)", fontWeight: 900 },
+  exceptionText: { marginTop: 10, borderRadius: 6, background: "var(--surface)", padding: 9, fontSize: 11.5, color: "var(--ink-soft)", lineHeight: 1.45 },
   section: { padding: "22px 18px 0" },
   sectionTitle: { marginBottom: 10 },
   sectionHeading: { margin: 0, fontSize: 16, fontWeight: 900, color: "var(--ink)", letterSpacing: 0 },

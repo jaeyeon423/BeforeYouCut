@@ -437,6 +437,15 @@ function ProductDetailComposer({ product }) {
   const [isPending, startTransition] = useTransition();
   const missingCount = specRows.filter(([key, value]) => REQUIRED_SPEC.includes(key) && !String(value).trim()).length;
   const previewHighlights = splitDetailLines(detailValues.highlights).slice(0, 3);
+  const readiness = [
+    { label: "상품명", done: Boolean(name.trim()) },
+    { label: "가격", done: Number(price) > 0 },
+    { label: "대표 이미지", done: Boolean(imageFile || imageUrl || firstProductImage(product)) },
+    { label: "상세 소개", done: Boolean((detailValues.intro || desc).trim()) },
+    { label: "핵심 포인트", done: previewHighlights.length > 0 },
+    { label: "상품정보고시", done: missingCount === 0 },
+  ];
+  const readyCount = readiness.filter((item) => item.done).length;
 
   const updateSpec = (index, field, value) => {
     setSpecRows((rows) => rows.map((row, i) => {
@@ -489,6 +498,23 @@ function ProductDetailComposer({ product }) {
             </div>
           )}
           <Link href={`/products/${product.id}`} style={styles.previewLink}>실제 상세 보기</Link>
+        </div>
+      </div>
+
+      <div style={styles.readinessPanel}>
+        <div style={styles.readinessHead}>
+          <div>
+            <div style={styles.previewBrand}>공개 준비 체크</div>
+            <b style={styles.readinessTitle}>{readyCount} / {readiness.length} 완료</b>
+          </div>
+          <StatusPill>{product.reviewStatus === "APPROVED" ? "공개 가능" : product.reviewStatus === "REJECTED" ? "보완 필요" : "검수 대기"}</StatusPill>
+        </div>
+        <div style={styles.readinessList}>
+          {readiness.map((item) => (
+            <span key={item.label} style={item.done ? { ...styles.readinessChip, ...styles.readinessDone } : styles.readinessChip}>
+              {item.done ? "✓" : "·"} {item.label}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -1006,6 +1032,12 @@ const styles = {
   previewDesc: { margin: "8px 0", fontSize: 12, color: "var(--ink-soft)", lineHeight: 1.5 },
   previewHighlights: { display: "flex", flexDirection: "column", gap: 4, margin: "8px 0 10px", fontSize: 11.5, color: "var(--ink)" },
   previewLink: { fontSize: 12, fontWeight: 800, color: "var(--ink)", textDecoration: "underline" },
+  readinessPanel: { border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: 12 },
+  readinessHead: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  readinessTitle: { display: "block", marginTop: 4, fontSize: 15, color: "var(--ink)", fontWeight: 950 },
+  readinessList: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 },
+  readinessChip: { border: "1px solid var(--line)", borderRadius: 999, background: "var(--surface)", padding: "5px 8px", fontSize: 11.5, color: "var(--muted)", fontWeight: 800 },
+  readinessDone: { color: "var(--ink)", background: "#fff", borderColor: "var(--line-strong)" },
   inlineLink: { marginTop: 2, fontSize: 11.5, fontWeight: 800, color: "var(--ink)", textDecoration: "underline" },
   form: { display: "flex", flexDirection: "column", gap: 12 },
   label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 800, color: "var(--muted)" },
