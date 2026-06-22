@@ -490,6 +490,131 @@ a, .pcard, .rankrow, .brandcell {
 }
 .catcell .cat-label { font-size: 11px; font-weight: 600; letter-spacing: -0.02em; }
 
+.catalog-hero {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 14px 18px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 14px;
+}
+.catalog-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.catalog-kicker {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.catalog-hero h1 {
+  margin: 4px 0 4px;
+  font-size: 20px;
+  line-height: 1.25;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+.catalog-hero p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.catalog-filterbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 18px 0;
+  scrollbar-width: none;
+}
+.catalog-filterbar::-webkit-scrollbar { display: none; }
+.catalog-filter {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.catalog-filter.active {
+  background: var(--ink);
+  color: #fff !important;
+  border-color: var(--ink);
+}
+.catalog-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 0 18px 14px;
+}
+.catalog-toolbar b {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--ink);
+}
+.catalog-toolbar span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.catalog-toolbar select {
+  width: 112px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 8px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 800;
+}
+.catalog-empty {
+  margin: 0 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 24px 18px;
+  text-align: center;
+}
+.catalog-empty b {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+}
+.catalog-empty span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.catalog-empty a {
+  display: inline-flex;
+  margin-top: 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 /* category list rows */
 .catlist { padding: 4px 0; }
 .catlistrow {
@@ -516,6 +641,38 @@ a, .pcard, .rankrow, .brandcell {
 .search-section h4 {
   font-size: 13px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.02em;
   display: flex; align-items: center; justify-content: space-between;
+}
+.search-section .chip {
+  border: 1px solid var(--line);
+  font-family: var(--font);
+}
+.search-result-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 0 18px 14px;
+}
+.search-result-head b {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--ink);
+}
+.search-result-head span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.search-result-head a {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 .kwlist { display: flex; flex-direction: column; }
 .kwrow { display: flex; align-items: center; gap: 12px; padding: 9px 0; cursor: pointer; }
@@ -775,6 +932,28 @@ a, .pcard, .rankrow, .brandcell {
 .sp-actions .btn-ghost {
   flex: 1; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 999px;
   font-family: var(--font); font-weight: 700; font-size: 13px; cursor: pointer; color: var(--ink);
+}
+.sp-trust-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.sp-trust-grid div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.sp-trust-grid svg {
+  flex-shrink: 0;
+  color: var(--ink);
 }
 .sp-tabs { display: flex; border-bottom: 1px solid var(--line); margin-top: 22px; }
 .sp-tab { flex: 1; background: none; border: none; cursor: pointer; padding: 13px 0;

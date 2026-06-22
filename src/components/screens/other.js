@@ -109,6 +109,21 @@ function composeShippingAddress(address, addressDetail) {
   return [address, addressDetail].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
 }
 
+function categoryHref(cat, filter) {
+  const params = new URLSearchParams();
+  if (cat) params.set("cat", cat);
+  if (filter) params.set("filter", filter);
+  return `/category?${params.toString()}`;
+}
+
+function sortCatalogItems(items, sort) {
+  const copy = [...items];
+  if (sort === "price-asc") return copy.sort((a, b) => a.price - b.price);
+  if (sort === "price-desc") return copy.sort((a, b) => b.price - a.price);
+  if (sort === "review") return copy.sort((a, b) => (b.reviews || 0) - (a.reviews || 0));
+  return copy;
+}
+
 // ============================================================
 // CATEGORY
 // ============================================================
@@ -117,6 +132,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
+  const [sort, setSort] = useState("recommended");
 
   // Reset when the category or filter changes.
   useEffect(() => {
@@ -146,9 +162,33 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
   } else if (filter === "best") {
     displayTitle = `${cat} · 우선 검토`;
   }
+  const visibleItems = sortCatalogItems(items, sort);
+  const currentCategory = CATEGORIES.find((category) => category.key === cat) || CATEGORIES[0];
+  const filterTabs = [
+    { label: "전체", value: null },
+    { label: "신상품", value: "new" },
+    { label: "우선 검토", value: "best" },
+  ];
 
   return (
     <div className="byc-scroll fadein">
+      <div className="catalog-hero">
+        <div className="catalog-icon"><Icon name={currentCategory.icon || "grid"} size={24} /></div>
+        <div>
+          <div className="catalog-kicker">BUYER CATALOG</div>
+          <h1>{displayTitle}</h1>
+          <p>{total}개 상품을 판매자 정보, 가격, 배송 기준과 함께 비교하세요.</p>
+        </div>
+      </div>
+
+      <div className="catalog-filterbar">
+        {filterTabs.map((tab) => (
+          <Link key={tab.label} href={categoryHref(cat, tab.value)} className={"catalog-filter" + (filter === tab.value ? " active" : "")}>
+            {tab.label}
+          </Link>
+        ))}
+      </div>
+
       <div className="section" style={{ marginTop: 8 }}>
         <div className="catgrid">
           {CATEGORIES.map((c) => (
@@ -168,8 +208,27 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
       </div>
       <div className="divider-strip" style={{ marginTop: 20 }} />
       <div className="section" style={{ marginTop: 16 }}>
-        <SectionHeader title={displayTitle} sub={`${total}개 상품`} />
-        <ProductGrid items={items} variant="meta" />
+        <div className="catalog-toolbar">
+          <div>
+            <b>{displayTitle}</b>
+            <span>{visibleItems.length}개 표시 · 총 {total}개</span>
+          </div>
+          <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="상품 정렬">
+            <option value="recommended">추천순</option>
+            <option value="price-asc">낮은 가격순</option>
+            <option value="price-desc">높은 가격순</option>
+            <option value="review">리뷰 많은순</option>
+          </select>
+        </div>
+        {visibleItems.length > 0 ? (
+          <ProductGrid items={visibleItems} variant="meta" />
+        ) : (
+          <div className="catalog-empty">
+            <b>조건에 맞는 상품이 없습니다</b>
+            <span>다른 카테고리나 필터를 선택해 보세요.</span>
+            <Link href="/category">전체 상품 보기</Link>
+          </div>
+        )}
         {hasMore && (
           <div style={{ padding: "20px 18px" }}>
             <button className="btn-ghost" style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid var(--line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}
@@ -194,6 +253,8 @@ export function SearchScreen({ products = [] }) {
     ? products.filter((p) =>
         (p.name + (sellers[p.seller]?.name || p.seller) + p.cat).toLowerCase().includes(q.toLowerCase()))
     : [];
+  const suggestedCategories = CATEGORIES.filter((category) => category.key !== "전체").slice(0, 7);
+  const suggestedProducts = products.slice(0, 6);
 
   return (
     <div className="byc-scroll fadein">
@@ -207,24 +268,46 @@ export function SearchScreen({ products = [] }) {
       {!q && (
         <>
           <div className="search-section">
-            <h4>브랜드 바로가기</h4>
+            <h4>추천 검색</h4>
+            <div className="chiprow" style={{ padding: "0 0 4px" }}>
+              {suggestedCategories.map((category) => (
+                <button key={category.key} type="button" className="chip" onClick={() => setQ(category.key)}>{category.key}</button>
+              ))}
+            </div>
+          </div>
+          <div className="search-section">
+            <h4>입점 브랜드</h4>
             <div className="chiprow" style={{ padding: "0 0 4px" }}>
               {Object.values(sellers).map((s) => (
                 <Link key={s.id} href={`/sellers/${s.id}`} className="chip" style={{ textDecoration: "none" }}>{s.name}</Link>
               ))}
             </div>
           </div>
+          {suggestedProducts.length > 0 && (
+            <div className="section" style={{ marginTop: 22 }}>
+              <SectionHeader title="바로 둘러볼 상품" sub="검색 전에도 구매 가능한 상품을 확인하세요" more="전체" href="/category" />
+              <ProductRail items={suggestedProducts} variant="meta" />
+            </div>
+          )}
         </>
       )}
 
       {q && (
         <div className="section" style={{ marginTop: 14 }}>
-          <SectionHeader title={`'${q}' 검색 결과`} sub={`${results.length}개`} />
+          <div className="search-result-head">
+            <div>
+              <b>{q}</b>
+              <span>{results.length}개 상품 검색됨</span>
+            </div>
+            <Link href={`/category?cat=${encodeURIComponent(q)}`}>카테고리 보기</Link>
+          </div>
           {results.length ? (
             <ProductGrid items={results} variant="meta" />
           ) : (
-            <div style={{ padding: "60px 18px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-              검색 결과가 없습니다.
+            <div className="catalog-empty">
+              <b>검색 결과가 없습니다</b>
+              <span>상품명, 브랜드명, 카테고리를 다르게 입력해 보세요.</span>
+              <Link href="/category">전체 상품 보기</Link>
             </div>
           )}
         </div>
@@ -514,6 +597,11 @@ export function SellerScreen({ seller, products = [] }) {
         </div>
         <div className="sp-actions">
           <button className="btn-ghost" onClick={() => setInquireOpen(true)}>문의하기</button>
+        </div>
+        <div className="sp-trust-grid">
+          <div><Icon name="verified" size={16} /><span>{s.verified ? "검증 판매자" : "입점 판매자"}</span></div>
+          <div><Icon name="ship" size={16} /><span>배송·반품 안내</span></div>
+          <div><Icon name="bell" size={16} /><span>브랜드 문의 가능</span></div>
         </div>
       </div>
 

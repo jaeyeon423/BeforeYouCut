@@ -19,6 +19,7 @@ export function Placeholder({ icon = "scissors", tone = "tone-a", tag, size = 44
 
 export function ProductMedia({ p, image, size = 44, loading = "lazy" }) {
   const src = image || (Array.isArray(p?.images) ? p.images.find(Boolean) : null);
+  const fetchPriority = loading === "eager" ? "high" : "auto";
   if (src) {
     return (
       <Image
@@ -28,6 +29,7 @@ export function ProductMedia({ p, image, size = 44, loading = "lazy" }) {
         width={900}
         height={900}
         loading={loading}
+        fetchPriority={fetchPriority}
         unoptimized
       />
     );
@@ -71,7 +73,7 @@ export function Verified({ size = 13 }) {
 // ---------- product card (variants: minimal | meta | overlay) ----------
 // Navigation is a real <Link>; the like control is a span (role=button) so we
 // don't nest interactive <button> inside an <a>.
-export function ProductCard({ p, variant = "meta" }) {
+export function ProductCard({ p, variant = "meta", loading = "lazy" }) {
   const { sellers, likes, toggleLike } = useApp();
   const seller = sellers[p.seller] || { name: "알 수 없는 브랜드" };
   const liked = likes.has(p.id);
@@ -86,7 +88,7 @@ export function ProductCard({ p, variant = "meta" }) {
     return (
       <Link href={`/products/${p.id}`} className="pcard overlay">
         <div className="pcard-media">
-          <ProductMedia p={p} />
+          <ProductMedia p={p} loading={loading} />
           {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
           <div className="ov">
             <div className="ov-brand">{seller.name}</div>
@@ -101,7 +103,7 @@ export function ProductCard({ p, variant = "meta" }) {
   return (
     <Link href={`/products/${p.id}`} className="pcard">
       <div className="pcard-media">
-        <ProductMedia p={p} />
+        <ProductMedia p={p} loading={loading} />
         {p.badge && <span className={"badge " + p.badge}>{p.badge === "new" ? "NEW" : p.badge === "best" ? "BEST" : "LIMITED"}</span>}
         <span className="pcard-like" role="button" tabIndex={0} onClick={onLike} aria-label="찜">
           <Icon name="heart" size={20} fill={liked} stroke={1.8} />
@@ -130,8 +132,8 @@ export function ProductCard({ p, variant = "meta" }) {
 export function ProductRail({ items, variant }) {
   return (
     <div className="prow">
-      {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} />
+      {items.map((p, index) => (
+        <ProductCard key={p.id} p={p} variant={variant} loading={index < 2 ? "eager" : "lazy"} />
       ))}
     </div>
   );
@@ -141,8 +143,8 @@ export function ProductRail({ items, variant }) {
 export function ProductGrid({ items, variant }) {
   return (
     <div className="pgrid">
-      {items.map((p) => (
-        <ProductCard key={p.id} p={p} variant={variant} />
+      {items.map((p, index) => (
+        <ProductCard key={p.id} p={p} variant={variant} loading={index < 4 ? "eager" : "lazy"} />
       ))}
     </div>
   );
