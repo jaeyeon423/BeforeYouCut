@@ -145,6 +145,7 @@ Environment and secrets:
 - Sellers can edit buyer-facing product detail content from `src/components/screens/seller-dashboard.js`.
 - Sellers can add new products from `/seller`; product creation requires core purchase-facing fields instead of creating placeholder products.
 - Buyer-facing product detail pages render structured detail sections from `Product.spec`; sellers edit the same fields in `/seller`.
+- Buyer-facing product detail now has a dedicated `상세 내용` section composed from the same seller-editable detail fields: intro, highlights, usage/care, shipping, returns, and purchase notices.
 - Product cards, rankings, cart/order thumbnails, and detail pages render `Product.images`; sellers can upload a file to the Supabase Storage `product-images` bucket or paste an image URL in `/seller`.
 - New seller-created products default to `PENDING` review and are hidden from public marketplace loaders until an admin approves them.
 - `/admin` now provides a first-pass operations console: seller verify/hide, KYC review, product approve/reject/hide, order status update, refund approve/reject/complete handling, settlement confirm/pay/exclude handling, and CS reply/close handling. Admin writes create `AuditLog` records.

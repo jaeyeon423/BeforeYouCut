@@ -57,4 +57,19 @@ describe("role-specific UI contracts", () => {
     expect(source).toContain("운영 주문 검토");
     expect(source).toContain("환불 리스크");
   });
+
+  it("product detail keeps buyer-facing detail content aligned with seller composer", () => {
+    const buyerSource = readSource("src/components/screens/other.js");
+    const sellerSource = readSource("src/components/screens/seller-dashboard.js");
+    const detailSource = readSource("src/utils/product-detail.js");
+
+    expect(buyerSource).toContain("상품 상세 내용");
+    expect(buyerSource).toContain("detailNarrativeSections");
+    expect(buyerSource).toContain("pd-detail-content");
+    expect(sellerSource).toContain("상세내용 완성도");
+    expect(sellerSource).toContain("PRODUCT_DETAIL_FIELDS");
+    expect(detailSource).toContain("배송 안내");
+    expect(detailSource).toContain("교환/반품 안내");
+    expect(detailSource).toContain("구매 전 확인사항");
+  });
 });

@@ -533,12 +533,19 @@ function ProductDetailComposer({ product }) {
   const [isPending, startTransition] = useTransition();
   const missingCount = specRows.filter(([key, value]) => REQUIRED_SPEC.includes(key) && !String(value).trim()).length;
   const previewHighlights = splitDetailLines(detailValues.highlights).slice(0, 3);
+  const detailCompletion = PRODUCT_DETAIL_FIELDS.filter((field) => {
+    const value = field.id === "intro" ? detailValues.intro || desc : detailValues[field.id];
+    return Boolean(String(value || "").trim());
+  }).length;
   const readiness = [
     { label: "상품명", done: Boolean(name.trim()) },
     { label: "가격", done: Number(price) > 0 },
     { label: "대표 이미지", done: Boolean(imageFile || imageUrl || firstProductImage(product)) },
     { label: "상세 소개", done: Boolean((detailValues.intro || desc).trim()) },
     { label: "핵심 포인트", done: previewHighlights.length > 0 },
+    { label: "사용/관리", done: Boolean(String(detailValues.usage || "").trim()) },
+    { label: "배송/반품", done: Boolean(String(detailValues.shipping || "").trim()) && Boolean(String(detailValues.returns || "").trim()) },
+    { label: "구매 전 확인", done: Boolean(String(detailValues.notice || "").trim()) },
     { label: "상품정보고시", done: missingCount === 0 },
   ];
   const readyCount = readiness.filter((item) => item.done).length;
@@ -661,8 +668,13 @@ function ProductDetailComposer({ product }) {
         <div style={styles.specHead}>
           <div>
             <div style={styles.labelText}>상세페이지 본문</div>
-            <div style={styles.helpText}>구매자 상세페이지에 섹션별로 표시됩니다.</div>
+            <div style={styles.helpText}>구매자 상세페이지의 상세 내용 영역에 섹션별로 표시됩니다.</div>
           </div>
+        </div>
+
+        <div style={styles.detailGuideBox}>
+          <b>상세내용 완성도 {detailCompletion} / {PRODUCT_DETAIL_FIELDS.length}</b>
+          <span>상세 소개, 핵심 포인트, 사용/관리, 배송, 교환/반품, 구매 전 확인사항이 구매자 화면의 상세 내용으로 노출됩니다.</span>
         </div>
 
         <div style={styles.detailFields}>
@@ -1171,6 +1183,18 @@ const styles = {
     lineHeight: 1.55,
   },
   splitRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 },
+  detailGuideBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 5,
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    background: "var(--surface)",
+    padding: 12,
+    fontSize: 12,
+    color: "var(--ink-soft)",
+    lineHeight: 1.5,
+  },
   detailFields: { display: "flex", flexDirection: "column", gap: 12 },
   specHead: { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 4 },
   ghostButton: {

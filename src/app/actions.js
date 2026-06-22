@@ -253,6 +253,15 @@ function buildSellerProductSpec(draft, sellerName) {
     ],
     {
       intro: draft.desc,
+      highlights: [
+        `${draft.material} 소재와 ${draft.size} 규격`,
+        `${draft.category} 카테고리에 맞춘 현장 사용 정보`,
+        `${sellerName} 판매자가 직접 관리하는 상품`,
+      ].join("\n"),
+      usage: draft.care,
+      shipping: "결제 완료 후 판매자 확인을 거쳐 평균 1-2영업일 내 출고됩니다.\n도서산간 지역은 배송 기간이 추가될 수 있습니다.",
+      returns: "상품 수령 후 7일 이내 미사용 상품에 한해 교환/반품 신청이 가능합니다.\n사용 흔적, 구성품 훼손, 고객 부주의로 인한 손상은 제한될 수 있습니다.",
+      notice: `KC 인증 여부: ${draft.kcStatus}\nA/S 책임자: ${sellerName} 고객센터\n구매 전 소재, 치수, 취급 주의사항을 확인해 주세요.`,
     }
   );
 }

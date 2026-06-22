@@ -319,6 +319,19 @@ export function SearchScreen({ products = [] }) {
 // ============================================================
 // PRODUCT DETAIL
 // ============================================================
+const DETAIL_SPEC_SUMMARY = [
+  { label: "소재/구성", keys: ["소재"] },
+  { label: "치수/용량", keys: ["치수", "크기", "용량"] },
+  { label: "제조국", keys: ["제조국", "원산지"] },
+  { label: "인증/안전", keys: ["KC 인증 여부", "인증"] },
+  { label: "A/S", keys: ["A/S 책임자", "AS 책임자"] },
+];
+
+function findSpecValue(rows, keys) {
+  const found = rows.find(([key]) => keys.includes(String(key || "").trim()));
+  return found ? found[1] : "";
+}
+
 export function DetailScreen({ product: p, seller, related = [] }) {
   const router = useRouter();
   const { likes, toggleLike, showToast } = useApp();
@@ -336,6 +349,16 @@ export function DetailScreen({ product: p, seller, related = [] }) {
   const shippingGuide = details.shipping || "평균 2영업일 내 출고됩니다. 도서산간 지역은 배송 기간이 더 소요될 수 있습니다.";
   const returnGuide = details.returns || "상품 수령 후 7일 이내 미사용 상품에 한해 교환/반품 신청이 가능합니다. 사용 흔적이 있거나 구성품이 훼손된 경우 제한될 수 있습니다.";
   const purchaseNotice = details.notice || "상품별 소재, 치수, 인증 대상 여부를 확인해 주세요. 수작업 상품은 미세한 마감 차이가 있을 수 있습니다.";
+  const detailNarrativeSections = [
+    { label: "DETAIL", title: "상품 상세 설명", body: detailIntro },
+    { label: "CARE", title: "사용/관리 팁", items: splitDetailLines(usageTips) },
+    { label: "DELIVERY", title: "배송 안내", items: splitDetailLines(shippingGuide) },
+    { label: "RETURN", title: "교환/반품 기준", items: splitDetailLines(returnGuide) },
+    { label: "CHECK", title: "구매 전 확인사항", items: splitDetailLines(purchaseNotice) },
+  ];
+  const specSummaryRows = DETAIL_SPEC_SUMMARY
+    .map((item) => ({ label: item.label, value: findSpecValue(specRows, item.keys) }))
+    .filter((item) => item.value);
   const fallbackHighlights = [
     `${s.name} 판매자가 직접 구성한 상세 정보`,
     `${p.cat} 카테고리에 맞춘 사용/관리 안내`,
@@ -465,29 +488,37 @@ export function DetailScreen({ product: p, seller, related = [] }) {
           <span className="btn-follow" aria-hidden="true">판매자 정보</span>
         </Link>
 
-        <div className="pd-block">
-          <h5>사용과 관리</h5>
-          <p className="pd-paragraph">{usageTips}</p>
-        </div>
-
-        <div className="pd-block">
-          <h5>배송 · 교환 · 반품</h5>
-          <div className="pd-guide-grid">
-            <div>
-              <b>배송 안내</b>
-              <p>{shippingGuide}</p>
-            </div>
-            <div>
-              <b>교환/반품</b>
-              <p>{returnGuide}</p>
-            </div>
+        <section className="pd-detail-content" aria-label="상품 상세 내용">
+          <div className="pd-section-heading">
+            <span>상세 내용</span>
+            <h5>구매 전 확인할 핵심 정보</h5>
+            <p>판매자가 입력한 상세 설명, 사용 방법, 배송과 교환/반품 기준을 결제 전 한 화면에서 확인할 수 있습니다.</p>
           </div>
-        </div>
-
-        <div className="pd-block">
-          <h5>구매 전 확인사항</h5>
-          <p className="pd-paragraph">{purchaseNotice}</p>
-        </div>
+          <div className="pd-detail-card-list">
+            {detailNarrativeSections.map((section) => (
+              <article key={section.title} className="pd-detail-card">
+                <div className="pd-card-kicker">{section.label}</div>
+                <h6>{section.title}</h6>
+                {section.body && <p>{section.body}</p>}
+                {section.items && section.items.length > 0 && (
+                  <ul>
+                    {section.items.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                )}
+              </article>
+            ))}
+          </div>
+          {specSummaryRows.length > 0 && (
+            <div className="pd-spec-summary" aria-label="기본 상품 상세 정보">
+              {specSummaryRows.map((row) => (
+                <div key={row.label}>
+                  <span>{row.label}</span>
+                  <b>{row.value}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {specRows.length > 0 && (
           <div className="pd-block">

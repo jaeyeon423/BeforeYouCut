@@ -759,7 +759,6 @@ a, .pcard, .rankrow, .brandcell {
 .pd-divider { height: 8px; background: var(--surface); margin-top: 22px; }
 .pd-block { padding: 22px 18px; border-bottom: 1px solid var(--line); }
 .pd-block h5 { font-size: 13px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.02em; }
-.pd-paragraph { margin: 0; font-size: 13px; color: var(--ink-soft); line-height: 1.7; }
 .pd-detail-hero { padding: 26px 18px; border-bottom: 1px solid var(--line); }
 .pd-detail-hero .pd-kicker {
   font-size: 10px; font-weight: 900; color: var(--muted); letter-spacing: 0.08em;
@@ -773,10 +772,32 @@ a, .pcard, .rankrow, .brandcell {
   font-size: 12.5px; color: var(--ink); line-height: 1.45;
 }
 .pd-highlight-list svg { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
-.pd-guide-grid { display: grid; gap: 10px; }
-.pd-guide-grid div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fff; }
-.pd-guide-grid b { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--ink); }
-.pd-guide-grid p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.65; }
+.pd-detail-content { padding: 24px 18px; border-bottom: 1px solid var(--line); }
+.pd-section-heading { margin-bottom: 14px; }
+.pd-section-heading span {
+  display: block; font-size: 10px; font-weight: 900; color: var(--muted); letter-spacing: 0;
+}
+.pd-section-heading h5 { margin: 6px 0 6px; font-size: 15px; line-height: 1.35; font-weight: 900; }
+.pd-section-heading p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; }
+.pd-detail-card-list { display: grid; gap: 10px; }
+.pd-detail-card { border: 1px solid var(--line); border-radius: 8px; padding: 13px; background: #fff; }
+.pd-detail-card .pd-card-kicker {
+  font-size: 10px; font-weight: 900; color: var(--muted); letter-spacing: 0;
+}
+.pd-detail-card h6 { margin: 5px 0 8px; font-size: 13.5px; line-height: 1.35; font-weight: 900; }
+.pd-detail-card p { margin: 0; font-size: 12.8px; color: var(--ink-soft); line-height: 1.7; }
+.pd-detail-card ul { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.pd-detail-card li { display: flex; gap: 7px; align-items: flex-start; font-size: 12.8px; color: var(--ink-soft); line-height: 1.6; }
+.pd-detail-card li::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 7px;
+}
+.pd-spec-summary {
+  margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden;
+}
+.pd-spec-summary div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 12px; }
+.pd-spec-summary div:first-child { border-top: none; }
+.pd-spec-summary span { color: var(--muted); font-weight: 800; flex-shrink: 0; }
+.pd-spec-summary b { color: var(--ink); font-weight: 900; text-align: right; overflow-wrap: anywhere; }
 .pd-spec { display: flex; font-size: 13px; padding: 7px 0; }
 .pd-spec dt { width: 90px; color: var(--muted); flex-shrink: 0; }
 .pd-spec dd { margin: 0; color: var(--ink-soft); }
