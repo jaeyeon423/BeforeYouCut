@@ -152,6 +152,7 @@ Environment and secrets:
 - Buyer-facing product and seller inquiry modals now create real `CsInquiry` rows instead of showing local-only placeholder success messages.
 - `/orders/[id]` now provides a shared private order detail page. Buyers can view shipment/refund state and request refunds; sellers/admins can register shipment tracking for authorized orders.
 - Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
+- Toss payment status webhooks are accepted at `/api/webhooks/toss`; configure the Toss developer-center webhook URL with `?token=$TOSS_WEBHOOK_SECRET`. The webhook reuses the same paid-payment settlement path as success redirects and can recover a `DONE` payment into an order idempotently.
 - Product detail has a buyer-facing direct order flow: `replaceCart([product])` then `/cart?checkout=1`, where cart auto-opens checkout or sends guests to `/my?auth=signin&returnTo=/cart?checkout=1`.
 - Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget, and unit/floor details are captured in a separate detail-address field before being composed into the final order address.
 - Signup uses a shopping-mall style flow in `/my`: buyer name/phone, SMS OTP verification, email/password, required terms. `registerBuyer` performs final server-side signup only after `PhoneVerification` is verified.
@@ -178,7 +179,7 @@ Environment and secrets:
 
 ## Known Gaps
 
-- Toss Payments payment-window request and server-side confirmation flow is implemented; real Toss test/live keys, production webhook handling, and operational PG dashboard verification are still required.
+- Toss Payments payment-window request, server-side confirmation flow, and payment status webhook route are implemented; real Toss test/live keys, webhook secret registration, and operational PG dashboard verification are still required.
 - Admin review and seller approval workflow has a first-pass `/admin` implementation with KYC status/private document review, but the Supabase storage policy SQL still needs to be applied and verified in production.
 - Admins can record refund approval/rejection/completion and CS replies, but actual PG refund API execution is not implemented.
 - Admins can record settlement confirmation/payment status, but actual bank transfer/API payout execution is not implemented.

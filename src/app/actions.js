@@ -20,6 +20,7 @@ import {
   formatSeller,
   normalizeProductImages,
 } from "@/server/services/catalog-service";
+import { settlePaidPaymentWithOrder } from "@/server/services/payment-service";
 
 // ============================================================
 //  Internal formatters & helpers (not exported → not server actions)
@@ -420,54 +421,6 @@ async function buildCheckoutLines({ total, items }) {
 function buildOrderName(lines) {
   const firstName = lines[0]?.productName || "미용사 상품";
   return lines.length > 1 ? `${firstName} 외 ${lines.length - 1}건` : firstName;
-}
-
-async function createOrderFromPaidPayment(tx, payment, activeUserId) {
-  const lines = Array.isArray(payment.itemsSnapshot) ? payment.itemsSnapshot : [];
-  if (lines.length === 0) throw new Error("결제 상품 정보가 비어 있습니다.");
-  const commissionRate = siteConfig.commission.rate;
-
-  const created = await tx.order.create({
-    data: {
-      userId: activeUserId,
-      name: payment.buyerName,
-      phone: payment.buyerPhone,
-      address: payment.shippingAddress,
-      total: payment.amount,
-      status: "결제완료",
-      items: {
-        create: lines.map((line) => ({
-          productId: line.productId,
-          price: line.price,
-          quantity: line.quantity,
-        })),
-      },
-    },
-    include: { items: true },
-  });
-
-  await Promise.all(
-    created.items.map((item) => {
-      const line = lines.find((candidate) => candidate.productId === item.productId);
-      const saleAmount = item.price * item.quantity;
-      const commissionAmount = Math.floor(saleAmount * commissionRate);
-      return tx.settlement.upsert({
-        where: { orderItemId: item.id },
-        update: {},
-        create: {
-          sellerId: line.sellerId,
-          orderItemId: item.id,
-          saleAmount,
-          commissionRate,
-          commissionAmount,
-          netAmount: saleAmount - commissionAmount,
-          status: "PENDING",
-        },
-      });
-    })
-  );
-
-  return created;
 }
 
 async function confirmTossPayment({ paymentKey, orderId, amount }) {
@@ -1244,19 +1197,13 @@ export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
       throw new Error("결제가 완료 상태가 아닙니다.");
     }
 
-    const order = await prisma.$transaction(async (tx) => {
-      const createdOrder = await createOrderFromPaidPayment(tx, payment, authUser.id);
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: "PAID",
-          paymentKey: cleanPaymentKey,
-          approvedAt: new Date(),
-          rawResponse: tossPayment,
-          orderId: createdOrder.id,
-        },
-      });
-      return createdOrder;
+    const approvedAt = tossPayment.approvedAt ? new Date(tossPayment.approvedAt) : null;
+    const order = await settlePaidPaymentWithOrder({
+      paymentId: payment.id,
+      activeUserId: authUser.id,
+      paymentKey: cleanPaymentKey,
+      rawResponse: tossPayment,
+      approvedAt: approvedAt && !Number.isNaN(approvedAt.getTime()) ? approvedAt : undefined,
     });
 
     revalidateTag("orders", "max");

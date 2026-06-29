@@ -22,9 +22,9 @@ const mockPrisma = {
   },
   product: { update: vi.fn(), create: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
   order: { create: vi.fn(), update: vi.fn() },
-  payment: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  payment: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   refundRequest: { findUnique: vi.fn(), update: vi.fn() },
-  settlement: { updateMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  settlement: { updateMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   csInquiry: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   csReply: { create: vi.fn() },
   phoneVerification: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -59,6 +59,7 @@ const {
   updateMyShippingProfile,
   verifySignupPhoneCode,
 } = await import("../app/actions.js");
+const { handleTossPaymentWebhook } = await import("../server/services/payment-service.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const authedUser = (id = "user-1", email = "test@example.com", user_metadata = {}) =>
@@ -218,6 +219,89 @@ describe("checkout payment flow", () => {
         userId: "user-1",
       }),
     });
+  });
+
+  it("토스 DONE 웹훅은 READY 결제를 선점하고 주문과 정산을 생성한다", async () => {
+    const payment = {
+      id: "payment-1",
+      providerOrderId: "ms-order-1",
+      status: "READY",
+      amount: 30000,
+      orderName: "프로 가위",
+      buyerName: "구매자",
+      buyerPhone: "01012345678",
+      shippingAddress: "서울시 강남구",
+      itemsSnapshot: [{ productId: "product-1", sellerId: "seller-1", price: 30000, quantity: 1 }],
+      userId: "user-1",
+      order: null,
+    };
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+    mockPrisma.payment.findUnique
+      .mockResolvedValueOnce(payment)
+      .mockResolvedValueOnce(payment);
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.order.create.mockResolvedValue({
+      id: "order-1",
+      items: [{ id: "item-1", productId: "product-1", price: 30000, quantity: 1 }],
+    });
+    mockPrisma.settlement.upsert.mockResolvedValue({});
+    mockPrisma.payment.update.mockResolvedValue({});
+
+    const result = await handleTossPaymentWebhook({
+      eventType: "PAYMENT_STATUS_CHANGED",
+      data: {
+        orderId: "ms-order-1",
+        paymentKey: "payment-key-1",
+        status: "DONE",
+        totalAmount: 30000,
+        approvedAt: "2026-06-29T12:00:00+09:00",
+      },
+    });
+
+    expect(result).toEqual({ success: true, action: "paid", orderId: "order-1" });
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: "payment-1", status: "READY" },
+      data: expect.objectContaining({
+        status: "PAID",
+        paymentKey: "payment-key-1",
+      }),
+    });
+    expect(mockPrisma.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        userId: "user-1",
+        total: 30000,
+        status: "결제완료",
+      }),
+    }));
+    expect(mockPrisma.settlement.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        sellerId: "seller-1",
+        orderItemId: "item-1",
+        saleAmount: 30000,
+      }),
+    }));
+  });
+
+  it("토스 웹훅 금액이 서버 결제 세션과 다르면 거부한다", async () => {
+    mockPrisma.payment.findUnique.mockResolvedValue({
+      id: "payment-1",
+      providerOrderId: "ms-order-1",
+      status: "READY",
+      amount: 30000,
+      paymentKey: null,
+      userId: "user-1",
+      order: null,
+    });
+
+    await expect(handleTossPaymentWebhook({
+      eventType: "PAYMENT_STATUS_CHANGED",
+      data: {
+        orderId: "ms-order-1",
+        paymentKey: "payment-key-1",
+        status: "DONE",
+        totalAmount: 29000,
+      },
+    })).rejects.toThrow("결제 금액");
   });
 });
 
