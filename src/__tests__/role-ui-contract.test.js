@@ -72,4 +72,20 @@ describe("role-specific UI contracts", () => {
     expect(detailSource).toContain("교환/반품 안내");
     expect(detailSource).toContain("구매 전 확인사항");
   });
+
+  it("category page keeps category and brand directory tabs", () => {
+    const pageSource = readSource("src/app/category/page.js");
+    const screenSource = readSource("src/components/screens/other.js");
+    const cssSource = readSource("src/app/globals.css");
+
+    expect(pageSource).toContain("getSellersMap");
+    expect(pageSource).toContain("tab === \"brand\"");
+    expect(screenSource).toContain("CATEGORY_DIRECTORY");
+    expect(screenSource).toContain("directory-tabs");
+    expect(screenSource).toContain("카테고리");
+    expect(screenSource).toContain("브랜드");
+    expect(screenSource).toContain("brand-directory-grid");
+    expect(cssSource).toContain(".directory-layout");
+    expect(cssSource).toContain(".directory-rail");
+  });
 });

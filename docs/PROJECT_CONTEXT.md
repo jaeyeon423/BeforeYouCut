@@ -162,6 +162,7 @@ Environment and secrets:
 - Role-specific UI composition is the product direction: buyer home/my-page surface shopping trust and account state first, seller center starts with daily operation queues, and admin console starts with risk/review queues before detailed lists.
 - Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Buyer discovery screens now provide catalog context, filter/sort controls, search suggestions, product rails, and seller trust indicators so browsing feels like a shopping workflow rather than a static list.
+- `/category` now works as a marketplace directory with `카테고리` and `브랜드` tabs, a left-side category rail, and right-side icon grids before product listing.
 - Seller/admin role screens now emphasize operating cadence: seller center surfaces the next action plus product/compliance/order quick links, while admin console starts with a review/KYC/refund/CS runbook before the detailed queues.
 - `/my` is the role-switching account hub: buyer stats stay focused on orders/saved items/shipping address, while seller/admin entry cards are separated and driven by server-loaded DB role/account summary.
 - `/orders/[id]` is shared by buyer/seller/admin but now frames the same order differently per role: buyer sees order/shipping/refund confidence, seller sees shipment and settlement-relevant handling, admin sees operational risk checks.
