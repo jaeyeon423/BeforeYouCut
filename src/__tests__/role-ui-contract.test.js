@@ -81,11 +81,16 @@ describe("role-specific UI contracts", () => {
     expect(pageSource).toContain("getSellersMap");
     expect(pageSource).toContain("tab === \"brand\"");
     expect(screenSource).toContain("CATEGORY_DIRECTORY");
+    expect(screenSource).toContain("category-directory");
     expect(screenSource).toContain("directory-tabs");
+    expect(screenSource).toContain("directory-filterbar");
     expect(screenSource).toContain("카테고리");
     expect(screenSource).toContain("브랜드");
+    expect(screenSource).toContain("염색·펌");
+    expect(screenSource).toContain("샴푸·케어");
     expect(screenSource).toContain("brand-directory-grid");
     expect(cssSource).toContain(".directory-layout");
     expect(cssSource).toContain(".directory-rail");
+    expect(cssSource).toContain(".category-directory");
   });
 });

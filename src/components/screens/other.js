@@ -132,14 +132,23 @@ const CATEGORY_DIRECTORY = [
     icon: "grid",
     sections: [
       {
-        title: "인기 카테고리",
+        title: "도구",
         items: [
           { label: "가위", icon: "scissors", href: "/category?cat=가위" },
           { label: "클리퍼", icon: "clipper", href: "/category?cat=클리퍼" },
           { label: "빗·브러시", icon: "comb", href: "/category?cat=빗·브러시" },
-          { label: "앞치마·유니폼", icon: "apron", href: "/category?cat=앞치마·유니폼" },
-          { label: "소모품", icon: "bottle", href: "/category?cat=소모품" },
+          { label: "드라이기", icon: "spark", href: "/category?cat=드라이기" },
           { label: "케이스·수납", icon: "case", href: "/category?cat=케이스·수납" },
+          { label: "앞치마·유니폼", icon: "apron", href: "/category?cat=앞치마·유니폼" },
+        ],
+      },
+      {
+        title: "소모품·케어",
+        items: [
+          { label: "소모품", icon: "bottle", href: "/category?cat=소모품" },
+          { label: "염색·펌", icon: "bottle", href: "/category?cat=염색·펌" },
+          { label: "샴푸·케어", icon: "bottle", href: "/category?cat=샴푸·케어" },
+          { label: "소독·위생", icon: "spark", href: "/category?cat=소독·위생" },
         ],
       },
     ],
@@ -182,6 +191,62 @@ const CATEGORY_DIRECTORY = [
         items: ["커트빗", "꼬리빗", "롤브러시", "패들브러시", "염색 브러시", "더스트 브러시"].map((label, index) => ({
           label,
           icon: index > 1 ? "brush" : "comb",
+        })),
+      },
+    ],
+  },
+  {
+    key: "염색·펌",
+    title: "염색·펌",
+    icon: "bottle",
+    sections: [
+      {
+        title: "품목별",
+        items: ["염모제", "산화제", "펌제", "중화제", "블리치", "컬러차트"].map((label) => ({
+          label,
+          icon: "bottle",
+        })),
+      },
+    ],
+  },
+  {
+    key: "샴푸·케어",
+    title: "샴푸·케어",
+    icon: "bottle",
+    sections: [
+      {
+        title: "품목별",
+        items: ["샴푸", "트리트먼트", "두피케어", "에센스", "스타일링제", "열보호제"].map((label, index) => ({
+          label,
+          icon: index > 2 ? "spark" : "bottle",
+        })),
+      },
+    ],
+  },
+  {
+    key: "드라이기",
+    title: "드라이기",
+    icon: "spark",
+    sections: [
+      {
+        title: "품목별",
+        items: ["드라이어", "고데기", "아이론", "디퓨저", "열기기 거치대", "전기용품"].map((label, index) => ({
+          label,
+          icon: index === 4 ? "case" : "spark",
+        })),
+      },
+    ],
+  },
+  {
+    key: "소독·위생",
+    title: "소독·위생",
+    icon: "spark",
+    sections: [
+      {
+        title: "품목별",
+        items: ["소독기", "소독제", "일회용 장갑", "마스크", "타월", "넥페이퍼"].map((label, index) => ({
+          label,
+          icon: index < 2 ? "spark" : "bottle",
         })),
       },
     ],
@@ -237,8 +302,8 @@ function directoryItemHref(group, item) {
 // ============================================================
 // CATEGORY
 // ============================================================
-export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMore = false, total = 0, filter = null, tab = "category", sellers = [] }) {
-  const { following, toggleFollow } = useApp();
+export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMore = false, total = 0, filter = null, tab = "category", sellers: serverSellers = [] }) {
+  const { sellers: contextSellers, following, toggleFollow } = useApp();
   const [items, setItems] = useState(initialItems);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -275,16 +340,25 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
   }
   const visibleItems = sortCatalogItems(items, sort);
   const currentDirectory = CATEGORY_DIRECTORY.find((category) => category.key === cat) || CATEGORY_DIRECTORY[0];
+  const sellerDirectory = useMemo(() => {
+    if (serverSellers.length > 0) return serverSellers;
+    return Object.values(contextSellers || {});
+  }, [serverSellers, contextSellers]);
   const sellerGroups = useMemo(() => {
     const grouped = new Map();
-    sellers.forEach((seller) => {
+    sellerDirectory.forEach((seller) => {
       const key = seller.category || "기타";
       grouped.set(key, (grouped.get(key) || 0) + 1);
     });
-    return [{ key: "전체", count: sellers.length }, ...Array.from(grouped.entries()).map(([key, count]) => ({ key, count }))];
-  }, [sellers]);
+    const groups = Array.from(grouped.entries()).map(([key, count]) => ({ key, count }));
+    if (groups.length === 0) {
+      return CATEGORY_DIRECTORY.map((group) => ({ key: group.key, count: 0 }));
+    }
+    return [{ key: "전체", count: sellerDirectory.length }, ...groups];
+  }, [sellerDirectory]);
   const activeBrandCategory = sellerGroups.some((group) => group.key === cat) ? cat : "전체";
-  const visibleSellers = activeBrandCategory === "전체" ? sellers : sellers.filter((seller) => seller.category === activeBrandCategory);
+  const visibleSellers = activeBrandCategory === "전체" ? sellerDirectory : sellerDirectory.filter((seller) => seller.category === activeBrandCategory);
+  const shouldShowProducts = visibleItems.length > 0 || filter;
   const filterTabs = [
     { label: "전체", value: null },
     { label: "신상품", value: "new" },
@@ -293,153 +367,158 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
 
   return (
     <div className="byc-scroll fadein">
-      <div className="directory-tabs" role="tablist" aria-label="탐색 유형">
-        <Link role="tab" aria-selected={tab === "category"} href={categoryHref(cat, filter)} className={tab === "category" ? "active" : ""}>카테고리</Link>
-        <Link role="tab" aria-selected={tab === "brand"} href={categoryHref(cat, null, "brand")} className={tab === "brand" ? "active" : ""}>브랜드</Link>
-      </div>
+      <div className="category-directory">
+        <div className="directory-tabs" role="tablist" aria-label="탐색 유형">
+          <Link role="tab" aria-selected={tab === "category"} href={categoryHref(cat, filter)} className={tab === "category" ? "active" : ""}>카테고리</Link>
+          <Link role="tab" aria-selected={tab === "brand"} href={categoryHref(cat, null, "brand")} className={tab === "brand" ? "active" : ""}>브랜드</Link>
+        </div>
 
-      {tab === "category" ? (
-        <>
+        {tab === "category" ? (
+          <>
+            <div className="catalog-filterbar directory-filterbar">
+              {filterTabs.map((filterTab) => (
+                <Link key={filterTab.label} href={categoryHref(cat, filterTab.value)} className={"catalog-filter" + (filter === filterTab.value ? " active" : "")}>
+                  {filterTab.label}
+                </Link>
+              ))}
+            </div>
+            <div className="directory-layout">
+              <nav className="directory-rail" aria-label="카테고리 목록">
+                {CATEGORY_DIRECTORY.map((group) => (
+                  <Link
+                    key={group.key}
+                    href={categoryHref(group.key, filter)}
+                    className={currentDirectory.key === group.key ? "active" : ""}
+                  >
+                    {group.title}
+                  </Link>
+                ))}
+              </nav>
+              <div className="directory-panel">
+                <div className="directory-title">
+                  <div>
+                    <span className="directory-badge">{currentDirectory.title.slice(0, 1)}</span>
+                    <b>{currentDirectory.title}</b>
+                  </div>
+                  <Icon name="chev-r-sm" size={16} />
+                </div>
+                <div className="directory-actions">
+                  <Link href={categoryHref(currentDirectory.key, "new")}>신상품 보기</Link>
+                  <Link href={categoryHref(currentDirectory.key, null)}>전체 보기</Link>
+                </div>
+                {currentDirectory.sections.map((section) => (
+                  <section key={section.title} className="directory-section">
+                    <h3>{section.title}</h3>
+                    <div className="directory-grid">
+                      {section.items.map((item) => (
+                        <Link key={item.label} href={directoryItemHref(currentDirectory, item)} className="directory-item">
+                          <span className="directory-item-icon"><Icon name={item.icon || currentDirectory.icon} size={26} stroke={1.35} /></span>
+                          <b>{item.label}</b>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            {shouldShowProducts && (
+              <>
+                <div className="divider-strip" style={{ marginTop: 14 }} />
+                <div className="section" style={{ marginTop: 16 }}>
+                  <div className="catalog-toolbar">
+                    <div>
+                      <b>{displayTitle}</b>
+                      <span>{visibleItems.length}개 표시 · 총 {total}개</span>
+                    </div>
+                    <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="상품 정렬">
+                      <option value="recommended">추천순</option>
+                      <option value="price-asc">낮은 가격순</option>
+                      <option value="price-desc">높은 가격순</option>
+                      <option value="review">리뷰 많은순</option>
+                    </select>
+                  </div>
+                  {visibleItems.length > 0 ? (
+                    <ProductGrid items={visibleItems} variant="meta" />
+                  ) : (
+                    <div className="catalog-empty">
+                      <b>조건에 맞는 상품이 없습니다</b>
+                      <span>다른 카테고리나 필터를 선택해 보세요.</span>
+                      <Link href="/category">전체 상품 보기</Link>
+                    </div>
+                  )}
+                  {hasMore && (
+                    <div style={{ padding: "20px 18px" }}>
+                      <button className="btn-ghost" style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid var(--line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}
+                        onClick={loadMore} disabled={loading}>
+                        {loading ? "불러오는 중..." : "더보기"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
           <div className="directory-layout">
-            <nav className="directory-rail" aria-label="카테고리 목록">
-              {CATEGORY_DIRECTORY.map((group) => (
+            <nav className="directory-rail" aria-label="브랜드 카테고리">
+              {sellerGroups.map((group) => (
                 <Link
                   key={group.key}
-                  href={categoryHref(group.key, filter)}
-                  className={currentDirectory.key === group.key ? "active" : ""}
+                  href={categoryHref(group.key, null, "brand")}
+                  className={activeBrandCategory === group.key ? "active" : ""}
                 >
-                  {group.title}
+                  {group.key}
                 </Link>
               ))}
             </nav>
             <div className="directory-panel">
               <div className="directory-title">
                 <div>
-                  <span className="directory-badge">{currentDirectory.title.slice(0, 1)}</span>
-                  <b>{currentDirectory.title}</b>
+                  <span className="directory-badge">B</span>
+                  <b>브랜드</b>
                 </div>
                 <Icon name="chev-r-sm" size={16} />
               </div>
               <div className="directory-actions">
-                <Link href={categoryHref(currentDirectory.key, "new")}>신상품 보기</Link>
-                <Link href={categoryHref(currentDirectory.key, null)}>전체 보기</Link>
+                <Link href="/sellers">전체 브랜드 보기</Link>
+                <Link href="/seller">판매자 입점</Link>
               </div>
-              {currentDirectory.sections.map((section) => (
-                <section key={section.title} className="directory-section">
-                  <h3>{section.title}</h3>
-                  <div className="directory-grid">
-                    {section.items.map((item) => (
-                      <Link key={item.label} href={directoryItemHref(currentDirectory, item)} className="directory-item">
-                        <span className="directory-item-icon"><Icon name={item.icon || currentDirectory.icon} size={26} stroke={1.35} /></span>
-                        <b>{item.label}</b>
-                      </Link>
-                    ))}
+              <section className="directory-section">
+                <h3>{activeBrandCategory === "전체" ? "입점 브랜드" : `${activeBrandCategory} 브랜드`}</h3>
+                {visibleSellers.length > 0 ? (
+                  <div className="brand-directory-grid">
+                    {visibleSellers.map((seller) => {
+                      const isFollowing = following.has(seller.id);
+
+                      return (
+                        <article key={seller.id} className="brand-directory-item">
+                          <Link href={`/sellers/${seller.id}`} className="brand-directory-link">
+                            <span className="brand-directory-logo">
+                              <Placeholder icon={CAT_ICON[seller.category] || "scissors"} tone={seller.tone || "tone-a"} size={24} />
+                            </span>
+                            <b>{seller.name}{seller.verified && <Verified size={12} />}</b>
+                            <small>{seller.category || "기타"} · 상품 {seller.products || 0}개</small>
+                          </Link>
+                          <button type="button" onClick={() => toggleFollow(seller.id)} className={"brand-directory-follow" + (isFollowing ? " on" : "")}>
+                            {isFollowing ? "팔로잉" : "팔로우"}
+                          </button>
+                        </article>
+                      );
+                    })}
                   </div>
-                </section>
-              ))}
+                ) : (
+                  <div className="catalog-empty" style={{ margin: 0 }}>
+                    <b>입점 브랜드가 없습니다</b>
+                    <span>다른 브랜드 카테고리를 선택해 보세요.</span>
+                    <Link href="/category?tab=brand">전체 브랜드 보기</Link>
+                  </div>
+                )}
+              </section>
             </div>
           </div>
-
-          <div className="catalog-filterbar">
-            {filterTabs.map((filterTab) => (
-              <Link key={filterTab.label} href={categoryHref(cat, filterTab.value)} className={"catalog-filter" + (filter === filterTab.value ? " active" : "")}>
-                {filterTab.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="divider-strip" style={{ marginTop: 14 }} />
-          <div className="section" style={{ marginTop: 16 }}>
-            <div className="catalog-toolbar">
-              <div>
-                <b>{displayTitle}</b>
-                <span>{visibleItems.length}개 표시 · 총 {total}개</span>
-              </div>
-              <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="상품 정렬">
-                <option value="recommended">추천순</option>
-                <option value="price-asc">낮은 가격순</option>
-                <option value="price-desc">높은 가격순</option>
-                <option value="review">리뷰 많은순</option>
-              </select>
-            </div>
-            {visibleItems.length > 0 ? (
-              <ProductGrid items={visibleItems} variant="meta" />
-            ) : (
-              <div className="catalog-empty">
-                <b>조건에 맞는 상품이 없습니다</b>
-                <span>다른 카테고리나 필터를 선택해 보세요.</span>
-                <Link href="/category">전체 상품 보기</Link>
-              </div>
-            )}
-            {hasMore && (
-              <div style={{ padding: "20px 18px" }}>
-                <button className="btn-ghost" style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid var(--line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}
-                  onClick={loadMore} disabled={loading}>
-                  {loading ? "불러오는 중..." : "더보기"}
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="directory-layout">
-          <nav className="directory-rail" aria-label="브랜드 카테고리">
-            {sellerGroups.map((group) => (
-              <Link
-                key={group.key}
-                href={categoryHref(group.key, null, "brand")}
-                className={activeBrandCategory === group.key ? "active" : ""}
-              >
-                {group.key}
-              </Link>
-            ))}
-          </nav>
-          <div className="directory-panel">
-            <div className="directory-title">
-              <div>
-                <span className="directory-badge">B</span>
-                <b>브랜드</b>
-              </div>
-              <Icon name="chev-r-sm" size={16} />
-            </div>
-            <div className="directory-actions">
-              <Link href="/sellers">전체 브랜드 보기</Link>
-              <Link href="/seller">판매자 입점</Link>
-            </div>
-            <section className="directory-section">
-              <h3>{activeBrandCategory === "전체" ? "입점 브랜드" : `${activeBrandCategory} 브랜드`}</h3>
-              {visibleSellers.length > 0 ? (
-                <div className="brand-directory-grid">
-                  {visibleSellers.map((seller) => {
-                    const isFollowing = following.has(seller.id);
-
-                    return (
-                      <article key={seller.id} className="brand-directory-item">
-                        <Link href={`/sellers/${seller.id}`} className="brand-directory-link">
-                          <span className="brand-directory-logo">
-                            <Placeholder icon={CAT_ICON[seller.category] || "scissors"} tone={seller.tone || "tone-a"} size={24} />
-                          </span>
-                          <b>{seller.name}{seller.verified && <Verified size={12} />}</b>
-                          <small>{seller.category} · 상품 {seller.products}개</small>
-                        </Link>
-                        <button type="button" onClick={() => toggleFollow(seller.id)} className={"brand-directory-follow" + (isFollowing ? " on" : "")}>
-                          {isFollowing ? "팔로잉" : "팔로우"}
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="catalog-empty" style={{ margin: 0 }}>
-                  <b>입점 브랜드가 없습니다</b>
-                  <span>다른 브랜드 카테고리를 선택해 보세요.</span>
-                  <Link href="/category?tab=brand">전체 브랜드 보기</Link>
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
       <Foot />
     </div>
   );
