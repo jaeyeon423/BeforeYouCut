@@ -74,7 +74,7 @@ npm run verify:storage
 웹훅 URL:
 
 ```text
-https://miyongsa.kr/api/webhooks/toss?token=$TOSS_WEBHOOK_SECRET
+https://before-you-cut.vercel.app/api/webhooks/toss?token=$TOSS_WEBHOOK_SECRET
 ```
 
 등록 이벤트:

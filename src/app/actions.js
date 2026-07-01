@@ -346,6 +346,8 @@ function normalizeCheckoutOrigin(origin) {
     siteConfig.service.url,
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "",
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+    process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : "",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
   ].filter(Boolean);

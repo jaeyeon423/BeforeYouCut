@@ -28,7 +28,7 @@ const siteConfig = {
   service: {
     name:        "미용사",
     englishName: "MIYONGSA",
-    url:         "https://miyongsa.kr",                      // TODO(운영자 입력): 실서비스 도메인 확정 후 교체
+    url:         "https://before-you-cut.vercel.app",        // TODO(운영자 입력): custom domain 확정 후 교체
     description: "미용인을 위한 전문 도구 마켓플레이스",
     // 전자상거래법 제20조 — 통신판매중개자 고지 의무
     intermediaryNotice:

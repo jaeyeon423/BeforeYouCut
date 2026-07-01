@@ -24,7 +24,7 @@ Vercel Project Settings > Environment Variables에서 `Production` 범위로 설
 토스 개발자센터 웹훅 URL:
 
 ```text
-https://miyongsa.kr/api/webhooks/toss?token=$TOSS_WEBHOOK_SECRET
+https://before-you-cut.vercel.app/api/webhooks/toss?token=$TOSS_WEBHOOK_SECRET
 ```
 
 등록 이벤트:
@@ -96,7 +96,7 @@ npm run verify:storage
 배포된 Production URL까지 확인하려면:
 
 ```bash
-npm run verify:production-env -- --production --url https://miyongsa.kr
+npm run verify:production-env -- --production --url https://before-you-cut.vercel.app
 ```
 
 ## 7. 출시 전 사람이 확정해야 할 항목

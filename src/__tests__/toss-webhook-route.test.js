@@ -24,7 +24,7 @@ describe("Toss webhook route", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TOSS_WEBHOOK_SECRET", "webhook-secret");
 
-    const response = await POST(new Request("https://miyongsa.kr/api/webhooks/toss", {
+    const response = await POST(new Request("https://before-you-cut.vercel.app/api/webhooks/toss", {
       method: "POST",
       body: JSON.stringify({ eventType: "PAYMENT_STATUS_CHANGED" }),
     }));
@@ -41,7 +41,7 @@ describe("Toss webhook route", () => {
       eventType: "CANCEL_STATUS_CHANGED",
       data: { orderId: "ms-order-1", status: "CANCELED" },
     };
-    const response = await POST(new Request("https://miyongsa.kr/api/webhooks/toss?token=webhook-secret", {
+    const response = await POST(new Request("https://before-you-cut.vercel.app/api/webhooks/toss?token=webhook-secret", {
       method: "POST",
       body: JSON.stringify(payload),
     }));

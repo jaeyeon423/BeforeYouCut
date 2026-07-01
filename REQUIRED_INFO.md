@@ -19,7 +19,7 @@
 | `business.hostingLocation` | Amazon Web Services, 서울 (ap-northeast-2) | 푸터 공시 | Supabase 인프라 기준. 변경 시 업데이트 |
 | `business.privacyOfficer.name` | 김재연 | 개인정보처리방침 표시 | 내부 지정 개인정보보호책임자 |
 | `business.privacyOfficer.email` | jaeyeon423@gmail.com | 개인정보처리방침 표시 | 실제 수신 가능한 이메일 |
-| `service.url` | https://miyongsa.kr | 약관·메타태그 | 실서비스 도메인 확정 후 |
+| `service.url` | https://before-you-cut.vercel.app | 약관·메타태그 | 실서비스 도메인 확정 후 |
 | `commission.rate` | 0.05 (5%) | 정산 수수료 계산 | 입점계약서 기준 확정 후 |
 | `commission.settlementCycleDays` | 7 | 정산 주기 | 운영 정책 확정 후 |
 | `commission.purchaseConfirmDays` | 7 | 자동 구매확정 기간 | 운영 정책 확정 후 |
