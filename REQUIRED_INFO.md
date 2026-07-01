@@ -5,7 +5,7 @@
 
 ---
 
-## 1. 공개 표시 정보 (`src/site.config.ts`)
+## 1. 공개 표시 정보 (`src/site.config.js`)
 
 | 항목명 | 현재 임시값 | 용도 | 어디서 받는지 |
 |--------|-------------|------|--------------|
@@ -37,12 +37,20 @@
 | 환경변수명 | 현재 임시값 | 용도 | 어디서 받는지 |
 |-----------|-------------|------|--------------|
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | test_ck_your-toss-client-key | 토스페이먼츠 결제창 초기화 공개 키 | 토스페이먼츠 개발자센터 API 키 |
-| `TOSS_SECRET_KEY` | test_sk_your-toss-secret-key | 토스페이먼츠 결제 승인 API 인증 | 토스페이먼츠 개발자센터 API 키. 서버 전용 |
+| `TOSS_SECRET_KEY` | test_sk_your-toss-secret-key | 토스페이먼츠 결제 승인·취소 API 인증 | 토스페이먼츠 개발자센터 API 키. 서버 전용 |
+| `TOSS_WEBHOOK_SECRET` | replace-with-long-random-token | 토스페이먼츠 웹훅 공유 secret | `openssl rand -hex 32` 등으로 생성 후 토스 웹훅 URL token에 사용 |
 | `PG_MERCHANT_ID` | your-merchant-id | PG사 가맹점 ID | PG사(토스페이먼츠 등) 계약 후 |
 | `ENCRYPTION_KEY` | 32바이트 랜덤 hex | 계좌번호 등 민감 데이터 AES-256 암호화 | `openssl rand -hex 32` 로 생성 |
 | `ENCRYPTION_IV` | 16바이트 랜덤 hex | AES 암호화 IV | `openssl rand -hex 16` 로 생성 |
 | `SENTRY_AUTH_TOKEN` | your-auth-token | Sentry source map 업로드 | sentry.io → Settings → Auth Tokens |
 | `NEXT_PUBLIC_SENTRY_DSN` | — | Sentry 에러 수집 엔드포인트 | sentry.io → Project → Settings → Client Keys |
+| `SENTRY_ORG` | your-org-slug | Sentry release/source map 업로드 | sentry.io 조직 slug |
+| `SENTRY_PROJECT` | your-project-slug | Sentry release/source map 업로드 | sentry.io 프로젝트 slug |
+| `PHONE_VERIFICATION_SECRET` | 32바이트 이상 랜덤 secret | 휴대폰 인증번호 HMAC | `openssl rand -hex 32` 로 생성 |
+| `NAVER_SENS_SERVICE_ID` | — | SMS 인증번호 발송 | NAVER Cloud SENS |
+| `NAVER_SENS_ACCESS_KEY` | — | SMS 인증번호 발송 인증 | NAVER Cloud API 인증키 |
+| `NAVER_SENS_SECRET_KEY` | — | SMS 인증번호 발송 서명 | NAVER Cloud API secret |
+| `NAVER_SENS_SMS_FROM` | — | SMS 발신번호 | NAVER Cloud 사전 등록 발신번호 |
 
 ---
 
@@ -72,7 +80,7 @@
 
 ## 5. 판매자 유형 미확정 분기
 
-`site.config.ts > seller.allowedType` 값에 따라 아래 처리가 달라집니다.
+`src/site.config.js > seller.allowedType` 값에 따라 아래 처리가 달라집니다.
 
 | 항목 | BUSINESS (사업자) | INDIVIDUAL (개인) | 비고 |
 |------|-------------------|-------------------|------|

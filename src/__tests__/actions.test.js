@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 const mockGetUser = vi.fn();
@@ -65,6 +65,11 @@ const { handleTossPaymentWebhook } = await import("../server/services/payment-se
 const authedUser = (id = "user-1", email = "test@example.com", user_metadata = {}) =>
   ({ data: { user: { id, email, user_metadata } } });
 const noUser = () => ({ data: { user: null } });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 // ══════════════════════════════════════════════════════════════════════════
 // toggleLike
@@ -302,6 +307,50 @@ describe("checkout payment flow", () => {
         totalAmount: 29000,
       },
     })).rejects.toThrow("결제 금액");
+  });
+
+  it("토스 취소 웹훅은 PAID 결제를 취소 상태로 반영한다", async () => {
+    mockPrisma.payment.findUnique.mockResolvedValue({
+      id: "payment-1",
+      providerOrderId: "ms-order-1",
+      status: "PAID",
+      amount: 30000,
+      paymentKey: "payment-key-1",
+      userId: "user-1",
+      order: { id: "order-1" },
+    });
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await handleTossPaymentWebhook({
+      eventType: "CANCEL_STATUS_CHANGED",
+      data: {
+        orderId: "ms-order-1",
+        paymentKey: "payment-key-1",
+        status: "CANCELED",
+        totalAmount: 30000,
+        message: "관리자 환불",
+      },
+    });
+
+    expect(result).toEqual({ success: true, action: "canceled", status: "CANCELED" });
+    expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: "payment-1", status: { in: ["READY", "PAID"] } },
+      data: expect.objectContaining({
+        status: "CANCELED",
+        failureCode: "CANCELED",
+        failureMessage: "관리자 환불",
+      }),
+    });
+  });
+
+  it("지원하지 않는 토스 웹훅 이벤트는 무시한다", async () => {
+    const result = await handleTossPaymentWebhook({
+      eventType: "PAYOUT_STATUS_CHANGED",
+      data: { orderId: "ms-order-1", status: "DONE" },
+    });
+
+    expect(result).toEqual({ success: true, ignored: true, reason: "unsupported_event" });
+    expect(mockPrisma.payment.findUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -811,11 +860,33 @@ describe("admin support operations", () => {
 
   it("환불 완료 처리 시 주문을 환불완료로 바꾸고 미지급 정산을 제외한다", async () => {
     const resolvedAt = new Date("2026-06-19T00:00:00.000Z");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: "CANCELED",
+        paymentKey: "payment-key-1",
+        cancels: [{ cancelAmount: 30000, cancelReason: "관리자 환불 처리" }],
+      }),
+    });
+    vi.stubEnv("TOSS_SECRET_KEY", "test_sk_refund");
+    vi.stubGlobal("fetch", fetchMock);
     mockPrisma.refundRequest.findUnique.mockResolvedValue({
       id: "refund-1",
       status: "APPROVED",
       refundAmount: null,
-      order: { id: "order-1", status: "반품", total: 30000, items: [{ id: "item-1" }] },
+      order: {
+        id: "order-1",
+        status: "반품",
+        total: 30000,
+        items: [{ id: "item-1" }],
+        payment: {
+          id: "payment-1",
+          status: "PAID",
+          amount: 30000,
+          paymentKey: "payment-key-1",
+          rawResponse: { status: "DONE" },
+        },
+      },
     });
     mockPrisma.refundRequest.update.mockResolvedValue({
       id: "refund-1",
@@ -824,14 +895,41 @@ describe("admin support operations", () => {
       resolvedAt,
     });
     mockPrisma.order.update.mockResolvedValue({});
+    mockPrisma.payment.update.mockResolvedValue({});
     mockPrisma.settlement.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await updateAdminRefundStatus({ refundId: "refund-1", status: "COMPLETED" });
 
     expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.tosspayments.com/v1/payments/payment-key-1/cancel",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Basic /),
+          "Content-Type": "application/json",
+          "Idempotency-Key": "refund-refund-1-30000",
+        }),
+        body: JSON.stringify({
+          cancelReason: "관리자 환불 처리 (refund-1)",
+          cancelAmount: 30000,
+        }),
+      })
+    );
     expect(mockPrisma.order.update).toHaveBeenCalledWith({
       where: { id: "order-1" },
       data: { status: "환불완료" },
+    });
+    expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+      where: { id: "payment-1" },
+      data: expect.objectContaining({
+        status: "CANCELED",
+        failureCode: "ADMIN_REFUND",
+        rawResponse: expect.objectContaining({
+          status: "DONE",
+          refundCancelResponse: expect.objectContaining({ status: "CANCELED" }),
+        }),
+      }),
     });
     expect(mockPrisma.settlement.updateMany).toHaveBeenCalledWith({
       where: { orderItemId: { in: ["item-1"] }, status: { in: ["PENDING", "CONFIRMED"] } },

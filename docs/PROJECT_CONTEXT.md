@@ -1,6 +1,6 @@
 # 미용사 Project Context
 
-Last updated: 2026-06-22
+Last updated: 2026-07-01
 
 Purpose: give AI agents and developers the minimum project context needed to work without re-reading the whole repository. Read this first, then inspect only the task-relevant files.
 
@@ -44,7 +44,7 @@ npm run dev
 Known non-blocking warnings:
 
 - `npm run lint` currently reports a custom font warning from `src/app/layout.js`.
-- `npm run build` currently reports Sentry deprecation warnings for `disableLogger` and `automaticVercelMonitors`.
+- `npm run build` currently reports the Next.js workspace-root warning when multiple lockfiles exist under `/Users/jaeyeon423/wc`.
 
 ## File Map
 
@@ -153,6 +153,7 @@ Environment and secrets:
 - `/orders/[id]` now provides a shared private order detail page. Buyers can view shipment/refund state and request refunds; sellers/admins can register shipment tracking for authorized orders.
 - Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
 - Toss payment status webhooks are accepted at `/api/webhooks/toss`; configure the Toss developer-center webhook URL with `?token=$TOSS_WEBHOOK_SECRET`. The webhook reuses the same paid-payment settlement path as success redirects and can recover a `DONE` payment into an order idempotently.
+- Toss cancellation is wired for admin full-refund completion: `updateAdminRefundStatus({ status: "COMPLETED" })` calls the Toss cancel API, records the cancel response on `Payment.rawResponse`, marks the order `환불완료`, and cancels unpaid settlements. Partial refunds are intentionally blocked until the order/refund/settlement state model supports them.
 - Product detail has a buyer-facing direct order flow: `replaceCart([product])` then `/cart?checkout=1`, where cart auto-opens checkout or sends guests to `/my?auth=signin&returnTo=/cart?checkout=1`.
 - Buyers can save a default shipping profile from `/my` settings or checkout; address search uses the Kakao Postcode browser widget, and unit/floor details are captured in a separate detail-address field before being composed into the final order address.
 - Signup uses a shopping-mall style flow in `/my`: buyer name/phone, SMS OTP verification, email/password, required terms. `registerBuyer` performs final server-side signup only after `PhoneVerification` is verified.
@@ -175,20 +176,21 @@ Environment and secrets:
 - Home, seller profile, and my-page surfaces intentionally avoid Musinsa-scale fandom/ranking/review placeholders; prioritize specs, seller trust, shipping/returns, and purchase decisions.
 - Public service name is now `미용사` with `MIYONGSA` as the wordmark style. Fake public business values must not be displayed; use `src/site.config.js` and hide unknown legal values until the user provides real ones.
 - `docs/launch-gap-review.md` tracks Musinsa benchmark gaps and the remaining launch implementation order.
-- Admin console lives at `/admin`; external PG refund execution, PG webhook hardening, bank payout automation, and carrier tracking automation still need follow-up implementation.
+- Admin console lives at `/admin`; partial refunds, bank payout automation, and carrier tracking automation still need follow-up implementation.
+- `docs/vercel-production-checklist.md` plus `npm run verify:production-env`, `npm run verify:storage`, and `npm run bootstrap:admin` provide the current production preflight path.
 - Check the current pushed commit with `git log -1 --oneline`; this file intentionally avoids hardcoding a moving commit hash.
 
 ## Known Gaps
 
-- Toss Payments payment-window request, server-side confirmation flow, and payment status webhook route are implemented; real Toss test/live keys, webhook secret registration, and operational PG dashboard verification are still required.
+- Toss Payments payment-window request, server-side confirmation flow, payment/cancel webhook route, and full-refund cancel API path are implemented; real Toss live keys, webhook secret registration, and operational PG dashboard verification are still required.
 - Admin review and seller approval workflow has a first-pass `/admin` implementation with KYC status/private document review, but the Supabase storage policy SQL still needs to be applied and verified in production.
-- Admins can record refund approval/rejection/completion and CS replies, but actual PG refund API execution is not implemented.
+- Admins can record refund approval/rejection/completion and CS replies. Full refunds call the Toss cancel API; partial refunds are not implemented.
 - Admins can record settlement confirmation/payment status, but actual bank transfer/API payout execution is not implemented.
 - Real carrier tracking API integration is not implemented; sellers/admins can manually register carrier and tracking numbers.
 - Supabase Storage bucket and RLS/public-read policy for `product-images` must be verified in production.
 - Supabase Storage private bucket and policies for `seller-documents` are documented in `prisma/rls.sql`; production application and verification are still required.
 - Business registration, mail-order registration, final service domain, legal effective dates, and customer support details still need real values in `src/site.config.js`.
-- Sentry DSN/source map token values are pending.
+- Sentry config files exist; production DSN/source map token values are pending and checked by `npm run verify:production-env -- --production`.
 - Production RLS and storage policies should be verified before launch.
 - Legal pages are drafts and still need legal review.
 
@@ -201,6 +203,7 @@ Environment and secrets:
 - `docs/ai-human-launch-checklist.md`: AI-vs-human launch checklist from the business setup task.
 - `docs/production-roadmap-prompts.md`: roadmap prompts and product planning notes.
 - `docs/flutter-buyer-app-api-design.md`: Flutter buyer app and `/api/v1` API layer design. Use before adding app-facing APIs or mobile-specific service extraction.
+- `docs/vercel-production-checklist.md`: Production env, Toss webhook, Sentry, admin bootstrap, and storage verification checklist.
 
 ## Standard Verification
 

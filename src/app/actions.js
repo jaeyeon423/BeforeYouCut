@@ -20,7 +20,7 @@ import {
   formatSeller,
   normalizeProductImages,
 } from "@/server/services/catalog-service";
-import { settlePaidPaymentWithOrder } from "@/server/services/payment-service";
+import { cancelTossPayment, settlePaidPaymentWithOrder } from "@/server/services/payment-service";
 
 // ============================================================
 //  Internal formatters & helpers (not exported → not server actions)
@@ -440,6 +440,17 @@ async function confirmTossPayment({ paymentKey, orderId, amount }) {
     throw new Error(payload?.message || "토스페이먼츠 결제 승인에 실패했습니다.");
   }
   return payload;
+}
+
+function mergePaymentRefundResponse(existingRawResponse, refundCancelResponse) {
+  const base = existingRawResponse && typeof existingRawResponse === "object" && !Array.isArray(existingRawResponse)
+    ? existingRawResponse
+    : {};
+  return {
+    ...base,
+    refundCancelResponse,
+    refundCanceledAt: new Date().toISOString(),
+  };
 }
 
 function formatShipment(shipment) {
@@ -2270,6 +2281,15 @@ export async function updateAdminRefundStatus({ refundId, status, refundAmount }
             status: true,
             total: true,
             items: { select: { id: true } },
+            payment: {
+              select: {
+                id: true,
+                status: true,
+                amount: true,
+                paymentKey: true,
+                rawResponse: true,
+              },
+            },
           },
         },
       },
@@ -2283,8 +2303,35 @@ export async function updateAdminRefundStatus({ refundId, status, refundAmount }
     const numericRefundAmount = refundAmount === undefined || refundAmount === null || refundAmount === ""
       ? refund.order?.total
       : Number(refundAmount);
-    if (status === "COMPLETED" && (!Number.isFinite(numericRefundAmount) || numericRefundAmount < 0)) {
+    if (status === "COMPLETED" && (!Number.isFinite(numericRefundAmount) || numericRefundAmount <= 0)) {
       throw new Error("환불 완료 금액이 올바르지 않습니다.");
+    }
+    const roundedRefundAmount = status === "COMPLETED" ? Math.round(numericRefundAmount) : null;
+    let tossCancelResponse = null;
+
+    if (status === "COMPLETED") {
+      if (!refund.order?.id) throw new Error("환불할 주문을 찾을 수 없습니다.");
+      if (roundedRefundAmount !== refund.order.total) {
+        throw new Error("현재 관리자 환불 완료 처리는 주문 전체 환불만 지원합니다.");
+      }
+
+      const payment = refund.order.payment;
+      if (!payment) throw new Error("환불할 결제 정보를 찾을 수 없습니다.");
+      if (payment.amount !== refund.order.total) {
+        throw new Error("결제 금액과 주문 금액이 일치하지 않아 환불을 진행할 수 없습니다.");
+      }
+
+      if (payment.status !== "CANCELED") {
+        if (payment.status !== "PAID") {
+          throw new Error("결제 완료 상태의 주문만 환불 완료 처리할 수 있습니다.");
+        }
+        tossCancelResponse = await cancelTossPayment({
+          paymentKey: payment.paymentKey,
+          cancelReason: `관리자 환불 처리 (${refund.id})`,
+          cancelAmount: roundedRefundAmount,
+          idempotencyKey: `refund-${refund.id}-${roundedRefundAmount}`,
+        });
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -2292,7 +2339,7 @@ export async function updateAdminRefundStatus({ refundId, status, refundAmount }
         where: { id: refundId },
         data: {
           status,
-          refundAmount: status === "COMPLETED" ? Math.round(numericRefundAmount) : refund.refundAmount,
+          refundAmount: status === "COMPLETED" ? roundedRefundAmount : refund.refundAmount,
           resolvedAt: isFinalStatus ? new Date() : null,
           resolvedBy: status === "REQUESTED" ? null : admin.id,
         },
@@ -2304,6 +2351,20 @@ export async function updateAdminRefundStatus({ refundId, status, refundAmount }
 
       if (status === "COMPLETED" && refund.order?.id) {
         await tx.order.update({ where: { id: refund.order.id }, data: { status: "환불완료" } });
+        if (refund.order.payment?.id) {
+          await tx.payment.update({
+            where: { id: refund.order.payment.id },
+            data: {
+              status: "CANCELED",
+              failedAt: new Date(),
+              failureCode: "ADMIN_REFUND",
+              failureMessage: "관리자 환불 완료",
+              ...(tossCancelResponse
+                ? { rawResponse: mergePaymentRefundResponse(refund.order.payment.rawResponse, tossCancelResponse) }
+                : {}),
+            },
+          });
+        }
         const orderItemIds = refund.order.items.map((item) => item.id);
         if (orderItemIds.length > 0) {
           await tx.settlement.updateMany({

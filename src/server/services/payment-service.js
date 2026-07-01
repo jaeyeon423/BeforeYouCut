@@ -4,6 +4,8 @@ import siteConfig from "@/site.config";
 const PAID_PROVIDER_STATUS = "DONE";
 const FAILED_PROVIDER_STATUSES = new Set(["ABORTED", "EXPIRED"]);
 const CANCELED_PROVIDER_STATUSES = new Set(["CANCELED", "PARTIAL_CANCELED"]);
+const SUPPORTED_TOSS_WEBHOOK_EVENTS = new Set(["PAYMENT_STATUS_CHANGED", "CANCEL_STATUS_CHANGED"]);
+const TOSS_CANCEL_URL_BASE = "https://api.tosspayments.com/v1/payments";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -24,6 +26,54 @@ function parseTossDate(value) {
 function getFailureMessage(data = {}) {
   if (typeof data.failure === "string") return data.failure;
   return cleanText(data.failure?.message) || cleanText(data.message) || null;
+}
+
+function getTossSecretKey() {
+  return cleanText(process.env.TOSS_SECRET_KEY);
+}
+
+function createTossAuthorizationHeader(secretKey) {
+  return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
+}
+
+export async function cancelTossPayment({ paymentKey, cancelReason, cancelAmount, idempotencyKey } = {}) {
+  const cleanPaymentKey = cleanText(paymentKey);
+  if (!cleanPaymentKey) {
+    throw new Error("토스페이먼츠 paymentKey가 없어 환불을 처리할 수 없습니다.");
+  }
+
+  const secretKey = getTossSecretKey();
+  if (!secretKey) {
+    throw new Error("TOSS_SECRET_KEY 환경변수를 설정해야 환불을 처리할 수 있습니다.");
+  }
+
+  const body = {
+    cancelReason: cleanText(cancelReason) || "관리자 환불 처리",
+  };
+  const numericCancelAmount = Number(cancelAmount);
+  if (Number.isFinite(numericCancelAmount) && numericCancelAmount > 0) {
+    body.cancelAmount = Math.round(numericCancelAmount);
+  }
+
+  const headers = {
+    Authorization: createTossAuthorizationHeader(secretKey),
+    "Content-Type": "application/json",
+  };
+  const cleanIdempotencyKey = cleanText(idempotencyKey);
+  if (cleanIdempotencyKey) {
+    headers["Idempotency-Key"] = cleanIdempotencyKey;
+  }
+
+  const response = await fetch(`${TOSS_CANCEL_URL_BASE}/${encodeURIComponent(cleanPaymentKey)}/cancel`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.message || "토스페이먼츠 결제 취소에 실패했습니다.");
+  }
+  return payload;
 }
 
 export async function createOrderFromPaidPayment(tx, payment, activeUserId) {
@@ -122,13 +172,13 @@ export async function settlePaidPaymentWithOrder({ paymentId, activeUserId, paym
 
 export async function handleTossPaymentWebhook(event = {}) {
   const eventType = cleanText(event.eventType);
-  if (eventType && eventType !== "PAYMENT_STATUS_CHANGED") {
+  if (eventType && !SUPPORTED_TOSS_WEBHOOK_EVENTS.has(eventType)) {
     return { success: true, ignored: true, reason: "unsupported_event" };
   }
 
   const data = event.data || event.payment || event;
   const providerOrderId = cleanText(data.orderId);
-  const providerStatus = cleanText(data.status);
+  const providerStatus = cleanText(data.status) || cleanText(data.cancelStatus);
   if (!providerOrderId || !providerStatus) {
     throw new Error("토스페이먼츠 웹훅 데이터가 올바르지 않습니다.");
   }
@@ -166,7 +216,7 @@ export async function handleTossPaymentWebhook(event = {}) {
   if (FAILED_PROVIDER_STATUSES.has(providerStatus) || CANCELED_PROVIDER_STATUSES.has(providerStatus)) {
     const nextStatus = CANCELED_PROVIDER_STATUSES.has(providerStatus) ? "CANCELED" : "FAILED";
     const updated = await prisma.payment.updateMany({
-      where: { id: payment.id, status: "READY" },
+      where: { id: payment.id, status: { in: nextStatus === "CANCELED" ? ["READY", "PAID"] : ["READY"] } },
       data: {
         status: nextStatus,
         failedAt: new Date(),

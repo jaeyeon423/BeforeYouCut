@@ -998,10 +998,10 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutIntentHandled, setCheckoutIntentHandled] = useState(false);
-  const [buyerName, setBuyerName] = useState("");
-  const [buyerPhone, setBuyerPhone] = useState("");
-  const [shippingAddress, setShippingAddress] = useState("");
-  const [shippingAddressDetail, setShippingAddressDetail] = useState("");
+  const [buyerName, setBuyerName] = useState(shippingProfile?.name || "");
+  const [buyerPhone, setBuyerPhone] = useState(shippingProfile?.phone || "");
+  const [shippingAddress, setShippingAddress] = useState(shippingProfile?.address || "");
+  const [shippingAddressDetail, setShippingAddressDetail] = useState(shippingProfile?.addressDetail || "");
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -1014,8 +1014,8 @@ export function CartScreen({ initialCheckout = false, shippingProfile = null }) 
   }, [shippingProfile]);
 
   useEffect(() => {
-    if (!buyerName && user?.email) setBuyerName(user.email.split("@")[0]);
-  }, [buyerName, user]);
+    if (!buyerName && !shippingProfile?.name && user?.email) setBuyerName(user.email.split("@")[0]);
+  }, [buyerName, shippingProfile?.name, user]);
 
   const goToLogin = useCallback(() => {
     setCheckoutOpen(false);
