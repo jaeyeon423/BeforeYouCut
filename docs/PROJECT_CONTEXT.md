@@ -175,6 +175,7 @@ Environment and secrets:
 - Public buyer-facing loaders expose only active, non-deleted sellers and products owned by those sellers; inactive temporary seller accounts can still use `/seller` but are hidden from marketplace pages.
 - Home, seller profile, and my-page surfaces intentionally avoid Musinsa-scale fandom/ranking/review placeholders; prioritize specs, seller trust, shipping/returns, and purchase decisions.
 - Public service name is now `미용사` with `MIYONGSA` as the wordmark style. Fake public business values must not be displayed; use `src/site.config.js` and hide unknown legal values until the user provides real ones.
+- Public business info is partially filled in `src/site.config.js` for representative/contact/privacy officer. Business registration number and mail-order registration number are still blank.
 - `docs/launch-gap-review.md` tracks Musinsa benchmark gaps and the remaining launch implementation order.
 - Admin console lives at `/admin`; partial refunds, bank payout automation, and carrier tracking automation still need follow-up implementation.
 - `docs/vercel-production-checklist.md` plus `npm run verify:production-env`, `npm run verify:storage`, and `npm run bootstrap:admin` provide the current production preflight path.
@@ -204,6 +205,7 @@ Environment and secrets:
 - `docs/production-roadmap-prompts.md`: roadmap prompts and product planning notes.
 - `docs/flutter-buyer-app-api-design.md`: Flutter buyer app and `/api/v1` API layer design. Use before adding app-facing APIs or mobile-specific service extraction.
 - `docs/vercel-production-checklist.md`: Production env, Toss webhook, Sentry, admin bootstrap, and storage verification checklist.
+- `docs/remaining-launch-tasks.md`: current launch-blocking checklist after the latest business-info update.
 
 ## Standard Verification
 
