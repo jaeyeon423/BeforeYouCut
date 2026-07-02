@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/icons";
 import { Placeholder, ProductMedia } from "@/components/ui";
@@ -10,9 +11,12 @@ import { createClient } from "@/utils/supabase/client";
 import { CATEGORIES, CAT_ICON, won } from "@/data/data";
 import {
   PRODUCT_DETAIL_FIELDS,
+  PRODUCT_DETAIL_IMAGE_FIELD,
   buildDetailValues,
   buildProductSpec,
   parseProductSpec,
+  parseDetailImageUrls,
+  serializeDetailImageUrls,
   splitDetailLines,
 } from "@/utils/product-detail";
 
@@ -527,12 +531,14 @@ function ProductDetailComposer({ product }) {
   const [desc, setDesc] = useState(product.desc || "");
   const [imageUrl, setImageUrl] = useState(firstProductImage(product));
   const [imageFile, setImageFile] = useState(null);
+  const [detailImageFiles, setDetailImageFiles] = useState([]);
   const [detailValues, setDetailValues] = useState(() => buildDetailValues(parsedSpec.details, { intro: product.desc || "" }));
   const [specRows, setSpecRows] = useState(() => buildInitialSpecRows(parsedSpec.rows));
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const missingCount = specRows.filter(([key, value]) => REQUIRED_SPEC.includes(key) && !String(value).trim()).length;
   const previewHighlights = splitDetailLines(detailValues.highlights).slice(0, 3);
+  const detailImages = parseDetailImageUrls(detailValues.detailImages);
   const detailCompletion = PRODUCT_DETAIL_FIELDS.filter((field) => {
     const value = field.id === "intro" ? detailValues.intro || desc : detailValues[field.id];
     return Boolean(String(value || "").trim());
@@ -546,6 +552,7 @@ function ProductDetailComposer({ product }) {
     { label: "사용/관리", done: Boolean(String(detailValues.usage || "").trim()) },
     { label: "배송/반품", done: Boolean(String(detailValues.shipping || "").trim()) && Boolean(String(detailValues.returns || "").trim()) },
     { label: "구매 전 확인", done: Boolean(String(detailValues.notice || "").trim()) },
+    { label: "상세 이미지", done: detailImages.length > 0 || detailImageFiles.length > 0 },
     { label: "상품정보고시", done: missingCount === 0 },
   ];
   const readyCount = readiness.filter((item) => item.done).length;
@@ -568,14 +575,23 @@ function ProductDetailComposer({ product }) {
     startTransition(async () => {
       try {
         const uploadedImageUrl = imageFile ? await uploadProductImage(imageFile, product.seller) : "";
+        const uploadedDetailImageUrls = detailImageFiles.length
+          ? await Promise.all(detailImageFiles.map((file) => uploadProductImage(file, product.seller)))
+          : [];
+        const nextDetailValues = {
+          ...detailValues,
+          detailImages: serializeDetailImageUrls([...detailImages, ...uploadedDetailImageUrls]),
+        };
         await updateSellerProductDetail({
           productId: product.id,
           name,
           price,
           desc,
           imageUrl: uploadedImageUrl || imageUrl,
-          spec: buildProductSpec(specRows, detailValues),
+          spec: buildProductSpec(specRows, nextDetailValues),
         });
+        setDetailValues(nextDetailValues);
+        setDetailImageFiles([]);
         setMessage("저장되었습니다. 구매자 상세페이지에 반영됩니다.");
         router.refresh();
       } catch (error) {
@@ -690,6 +706,59 @@ function ProductDetailComposer({ product }) {
               />
             </label>
           ))}
+        </div>
+
+        <div style={styles.detailImagePanel}>
+          <div style={styles.specHead}>
+            <div>
+              <div style={styles.labelText}>{PRODUCT_DETAIL_IMAGE_FIELD.label}</div>
+              <div style={styles.helpText}>{PRODUCT_DETAIL_IMAGE_FIELD.help}</div>
+            </div>
+            <span style={styles.helpText}>{detailImages.length + detailImageFiles.length}장</span>
+          </div>
+          <label style={styles.label}>
+            상세 이미지 파일
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setDetailImageFiles(Array.from(e.target.files || []))}
+              style={styles.input}
+            />
+            <span style={styles.helpText}>여러 장을 선택하면 저장 시 상품 상세 이미지로 추가됩니다.</span>
+          </label>
+          <label style={styles.label}>
+            상세 이미지 URL 목록
+            <textarea
+              value={detailValues.detailImages || ""}
+              onChange={(e) => updateDetail("detailImages", e.target.value)}
+              placeholder={PRODUCT_DETAIL_IMAGE_FIELD.placeholder}
+              style={{ ...styles.textarea, minHeight: 118 }}
+            />
+          </label>
+          {(detailImages.length > 0 || detailImageFiles.length > 0) && (
+            <div style={styles.detailImageGrid}>
+              {detailImages.map((url) => (
+                <div key={url} style={styles.detailImagePreview}>
+                  <Image
+                    src={url}
+                    alt="상세 이미지 미리보기"
+                    width={360}
+                    height={360}
+                    loading="lazy"
+                    style={styles.detailImagePreviewImg}
+                    unoptimized
+                  />
+                </div>
+              ))}
+              {detailImageFiles.map((file) => (
+                <div key={`${file.name}-${file.size}`} style={styles.detailImagePending}>
+                  <Icon name="grid" size={18} />
+                  <span>{file.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={styles.specHead}>
@@ -1196,6 +1265,50 @@ const styles = {
     lineHeight: 1.5,
   },
   detailFields: { display: "flex", flexDirection: "column", gap: 12 },
+  detailImagePanel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 12,
+  },
+  detailImageGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
+    gap: 8,
+  },
+  detailImagePreview: {
+    minHeight: 112,
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    overflow: "hidden",
+    background: "var(--surface)",
+  },
+  detailImagePreviewImg: {
+    width: "100%",
+    height: "100%",
+    minHeight: 112,
+    objectFit: "cover",
+    display: "block",
+  },
+  detailImagePending: {
+    minHeight: 112,
+    border: "1px dashed var(--line-strong)",
+    borderRadius: 8,
+    background: "var(--surface)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    padding: 10,
+    fontSize: 11,
+    color: "var(--muted)",
+    textAlign: "center",
+    overflowWrap: "anywhere",
+  },
   specHead: { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 4 },
   ghostButton: {
     border: "1px solid var(--line)",

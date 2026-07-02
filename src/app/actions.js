@@ -6,7 +6,12 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { unstable_cache, revalidateTag } from "next/cache";
 import { cache } from "react";
 import crypto from "crypto";
-import { buildProductSpec } from "@/utils/product-detail";
+import {
+  PRODUCT_DETAIL_IMAGE_FIELD,
+  buildProductSpec,
+  parseDetailImageUrls,
+  serializeDetailImageUrls,
+} from "@/utils/product-detail";
 import siteConfig from "../site.config";
 import {
   PRODUCT_IMAGE_CACHE_VERSION,
@@ -212,6 +217,21 @@ function normalizeProductImageUrl(value) {
   }
 
   throw new Error("이미지 URL은 http(s) 또는 / 로 시작하는 경로여야 합니다.");
+}
+
+function normalizeProductSpecRow(entry) {
+  if (!Array.isArray(entry) || entry.length < 2) return null;
+  const key = String(entry[0] || "").trim();
+  const value = String(entry[1] || "").trim();
+  if (!key || !value) return null;
+
+  if (key === PRODUCT_DETAIL_IMAGE_FIELD.key) {
+    const urls = parseDetailImageUrls(value).map(normalizeProductImageUrl).filter(Boolean);
+    if (!urls.length) return null;
+    return [key, serializeDetailImageUrls(urls)];
+  }
+
+  return [key, value];
 }
 
 function validateProductDraft({ name, price, category, desc, material, origin, size, care, kcStatus, imageUrl }) {
@@ -2497,8 +2517,8 @@ export async function updateSellerProductDetail({ productId, name, price, desc, 
     }
 
     const cleanSpec = spec
-      .map(([key, value]) => [String(key || "").trim(), String(value || "").trim()])
-      .filter(([key, value]) => key && value);
+      .map(normalizeProductSpecRow)
+      .filter(Boolean);
     const cleanImageUrl = normalizeProductImageUrl(imageUrl);
 
     const updated = await prisma.product.update({

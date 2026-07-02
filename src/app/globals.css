@@ -911,6 +911,19 @@ a, .pcard, .rankrow, .brandcell {
 .pd-detail-card li::before {
   content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 7px;
 }
+.pd-detail-image-list { display: grid; gap: 12px; margin-top: 14px; }
+.pd-detail-image-frame {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.pd-detail-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 .pd-spec-summary {
   margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden;
 }

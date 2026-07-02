@@ -2,6 +2,7 @@
 
 import React, { useCallback, useMemo, useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Icon from '../icons';
 import { createClient } from '../../utils/supabase/client';
@@ -31,7 +32,7 @@ import {
   CAT_ICON,
   won,
 } from '../../data/data';
-import { parseProductSpec, splitDetailLines } from '@/utils/product-detail';
+import { parseDetailImageUrls, parseProductSpec, splitDetailLines } from '@/utils/product-detail';
 import { Foot } from './home';
 
 const TOSS_PAYMENTS_SDK_LOAD_TIMEOUT_MS = 10000;
@@ -673,6 +674,7 @@ export function DetailScreen({ product: p, seller, related = [] }) {
   const liked = likes.has(p.id);
   const { rows: specRows, details } = parseProductSpec(p.spec);
   const detailIntro = details.intro || p.desc || `${s.name}가 구성한 ${p.cat} 상품입니다. 상세 정보와 판매자 안내를 확인한 뒤 주문해 주세요.`;
+  const detailImages = parseDetailImageUrls(details.detailImages);
   const highlights = splitDetailLines(details.highlights);
   const usageTips = details.usage || "사용 후 마른 천으로 닦아 습기가 적은 곳에 보관해 주세요. 날이 있는 도구는 충격과 낙하에 주의해 주세요.";
   const shippingGuide = details.shipping || "평균 2영업일 내 출고됩니다. 도서산간 지역은 배송 기간이 더 소요될 수 있습니다.";
@@ -837,6 +839,23 @@ export function DetailScreen({ product: p, seller, related = [] }) {
               </article>
             ))}
           </div>
+          {detailImages.length > 0 && (
+            <div className="pd-detail-image-list" aria-label="판매자 상세 이미지">
+              {detailImages.map((image, index) => (
+                <figure key={`${image}-${index}`} className="pd-detail-image-frame">
+                  <Image
+                    className="pd-detail-image"
+                    src={image}
+                    alt={`${p.name} 상세 이미지 ${index + 1}`}
+                    width={1200}
+                    height={1600}
+                    loading="lazy"
+                    unoptimized
+                  />
+                </figure>
+              ))}
+            </div>
+          )}
           {specSummaryRows.length > 0 && (
             <div className="pd-spec-summary" aria-label="기본 상품 상세 정보">
               {specSummaryRows.map((row) => (

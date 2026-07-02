@@ -43,8 +43,17 @@ export const PRODUCT_DETAIL_FIELDS = [
   },
 ];
 
-const DETAIL_KEY_TO_ID = new Map(PRODUCT_DETAIL_FIELDS.map((field) => [field.key, field.id]));
-const DETAIL_IDS = new Set(PRODUCT_DETAIL_FIELDS.map((field) => field.id));
+export const PRODUCT_DETAIL_IMAGE_FIELD = {
+  id: "detailImages",
+  key: "상세 이미지",
+  label: "상세 이미지",
+  help: "상세 내용 중간에 노출할 이미지 URL을 한 줄에 하나씩 입력합니다.",
+  placeholder: "예:\nhttps://example.com/detail-1.jpg\n/product-images/detail-2.webp",
+};
+
+const ALL_DETAIL_FIELDS = [...PRODUCT_DETAIL_FIELDS, PRODUCT_DETAIL_IMAGE_FIELD];
+const DETAIL_KEY_TO_ID = new Map(ALL_DETAIL_FIELDS.map((field) => [field.key, field.id]));
+const DETAIL_IDS = new Set(ALL_DETAIL_FIELDS.map((field) => field.id));
 
 export function parseProductSpec(spec = []) {
   const rows = [];
@@ -76,7 +85,7 @@ export function buildProductSpec(rows = [], detailValues = {}) {
         .filter(([key]) => !DETAIL_KEY_TO_ID.has(key))
     : [];
 
-  const detailRows = PRODUCT_DETAIL_FIELDS
+  const detailRows = ALL_DETAIL_FIELDS
     .map((field) => [field.key, String(detailValues[field.id] || "").trim()])
     .filter(([, value]) => value);
 
@@ -84,7 +93,7 @@ export function buildProductSpec(rows = [], detailValues = {}) {
 }
 
 export function buildDetailValues(details = {}, fallback = {}) {
-  return PRODUCT_DETAIL_FIELDS.reduce((acc, field) => {
+  return ALL_DETAIL_FIELDS.reduce((acc, field) => {
     acc[field.id] = String(details[field.id] || fallback[field.id] || "");
     return acc;
   }, {});
@@ -95,6 +104,19 @@ export function splitDetailLines(value) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+export function parseDetailImageUrls(value) {
+  return splitDetailLines(value).filter((url, index, urls) => urls.indexOf(url) === index);
+}
+
+export function serializeDetailImageUrls(urls = []) {
+  if (!Array.isArray(urls)) return "";
+  return urls
+    .map((url) => String(url || "").trim())
+    .filter(Boolean)
+    .filter((url, index, list) => list.indexOf(url) === index)
+    .join("\n");
 }
 
 export function isProductDetailField(id) {

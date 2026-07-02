@@ -51,6 +51,7 @@ const {
   toggleFollow,
   createSeller,
   createSellerProduct,
+  updateSellerProductDetail,
   updateAdminInquiry,
   updateAdminOrderStatus,
   updateAdminProductReview,
@@ -1180,5 +1181,63 @@ describe("createSellerProduct", () => {
     expect(mockPrisma.seller.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { productsCount: 3 } })
     );
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// updateSellerProductDetail
+// ══════════════════════════════════════════════════════════════════════════
+describe("updateSellerProductDetail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("판매자 상세 이미지 URL을 spec에 정규화해서 저장한다", async () => {
+    mockGetUser.mockResolvedValue(authedUser("seller-user-1"));
+    mockPrisma.seller.findUnique.mockResolvedValue({ id: "seller-1", name: "셀러" });
+    mockPrisma.product.findUnique.mockResolvedValue({ id: "product-1", sellerId: "seller-1" });
+    mockPrisma.product.update.mockResolvedValue({
+      id: "product-1",
+      sellerId: "seller-1",
+      name: "상세 이미지 상품",
+      price: 20000,
+      cat: "가위",
+      icon: "scissors",
+      tone: "tone-a",
+      badge: "new",
+      disc: null,
+      orig: null,
+      rating: 4.8,
+      reviews: 0,
+      likesCount: 0,
+      images: ["/product-images/main.svg"],
+      spec: [],
+      desc: "상세 이미지 테스트 상품입니다.",
+      isActive: true,
+      reviewStatus: "PENDING",
+    });
+
+    const result = await updateSellerProductDetail({
+      productId: "product-1",
+      name: "상세 이미지 상품",
+      price: 20000,
+      desc: "상세 이미지 테스트 상품입니다.",
+      imageUrl: "/product-images/main.svg",
+      spec: [
+        ["소재", "440C"],
+        ["상세 이미지", "/product-images/detail-1.jpg\nhttps://example.com/detail-2.webp\n/product-images/detail-1.jpg"],
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.product.update).toHaveBeenCalledWith({
+      where: { id: "product-1" },
+      data: expect.objectContaining({
+        spec: [
+          ["소재", "440C"],
+          ["상세 이미지", "/product-images/detail-1.jpg\nhttps://example.com/detail-2.webp"],
+        ],
+      }),
+    });
   });
 });
