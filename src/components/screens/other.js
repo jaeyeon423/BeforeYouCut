@@ -34,23 +34,71 @@ import {
 import { parseProductSpec, splitDetailLines } from '@/utils/product-detail';
 import { Foot } from './home';
 
+const TOSS_PAYMENTS_SDK_LOAD_TIMEOUT_MS = 10000;
+let tossPaymentsSdkPromise = null;
+
 function loadTossPaymentsSdk(src) {
-  return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") return reject(new Error("브라우저에서만 결제를 진행할 수 있습니다."));
-    if (window.TossPayments) return resolve();
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      existing.addEventListener("load", resolve, { once: true });
-      existing.addEventListener("error", () => reject(new Error("결제창 SDK를 불러오지 못했습니다.")), { once: true });
-      return;
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("브라우저에서만 결제를 진행할 수 있습니다."));
+  }
+  if (window.TossPayments) return Promise.resolve();
+  if (tossPaymentsSdkPromise) return tossPaymentsSdkPromise;
+
+  tossPaymentsSdkPromise = new Promise((resolve, reject) => {
+    let script = document.querySelector(`script[src="${src}"]`);
+    if (script?.dataset.tossPaymentsLoaded === "true" && !window.TossPayments) {
+      script.remove();
+      script = null;
     }
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("결제창 SDK를 불러오지 못했습니다."));
-    document.head.appendChild(script);
+
+    const createdScript = !script;
+    if (!script) {
+      script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.dataset.tossPaymentsSdk = "true";
+    }
+
+    let timeoutId;
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+    };
+    const fail = (message) => {
+      cleanup();
+      script.remove();
+      reject(new Error(message));
+    };
+    const handleLoad = () => {
+      script.dataset.tossPaymentsLoaded = "true";
+      if (window.TossPayments) {
+        cleanup();
+        resolve();
+        return;
+      }
+      fail("결제창 SDK를 초기화하지 못했습니다.");
+    };
+    const handleError = () => fail("결제창 SDK를 불러오지 못했습니다.");
+
+    timeoutId = window.setTimeout(() => {
+      if (window.TossPayments) {
+        cleanup();
+        resolve();
+        return;
+      }
+      fail("결제창 SDK 응답이 지연되고 있습니다. 새로고침 후 다시 시도해 주세요.");
+    }, TOSS_PAYMENTS_SDK_LOAD_TIMEOUT_MS);
+
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+    if (createdScript) document.head.appendChild(script);
+  }).catch((error) => {
+    tossPaymentsSdkPromise = null;
+    throw error;
   });
+
+  return tossPaymentsSdkPromise;
 }
 
 const KAKAO_POSTCODE_SDK_URL = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
