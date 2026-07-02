@@ -14,10 +14,11 @@ describe("role-specific UI contracts", () => {
     expect(source).toContain("NEXT ACTION");
     expect(source).toContain("상품 등록/수정");
     expect(source).toContain("운영 정보");
-    expect(source).toContain("주문·정산");
-    expect(source).toContain("seller-products");
-    expect(source).toContain("seller-compliance");
-    expect(source).toContain("seller-orders");
+    expect(source).toContain("주문 처리");
+    expect(source).toContain("정산 확인");
+    expect(source).toContain("SellerBottomTabs");
+    expect(source).toContain("activeTab");
+    expect(source).toContain("settlements");
   });
 
   it("admin console keeps operating runbook and risk summary", () => {
