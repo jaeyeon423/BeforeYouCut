@@ -510,7 +510,7 @@ a, .pcard, .rankrow, .brandcell {
 }
 .directory-filterbar .catalog-filter.active { color: var(--ink); background: transparent; }
 .directory-layout {
-  display: grid; grid-template-columns: 112px 1fr; min-height: 520px;
+  display: grid; grid-template-columns: 120px 1fr; min-height: 520px;
   border-bottom: 1px solid var(--line); background: #fff;
 }
 .directory-rail {
@@ -520,6 +520,7 @@ a, .pcard, .rankrow, .brandcell {
 .directory-rail a {
   display: flex; align-items: center; min-height: 42px; padding: 0 14px;
   color: var(--muted); font-size: 12.5px; font-weight: 800; text-decoration: none;
+  white-space: normal; word-break: keep-all; line-height: 1.25;
 }
 .directory-rail a.active { color: var(--ink); background: #fff; }
 .directory-panel { min-width: 0; padding: 14px 14px 22px; }
@@ -587,7 +588,7 @@ a, .pcard, .rankrow, .brandcell {
   .category-directory { max-width: none; border-left: 0; border-right: 0; }
 }
 @media (max-width: 420px) {
-  .directory-layout { grid-template-columns: 96px 1fr; }
+  .directory-layout { grid-template-columns: 104px 1fr; }
   .directory-rail a { padding: 0 12px; font-size: 12px; }
 }
 .catgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 6px; padding: 8px 18px 4px; }
