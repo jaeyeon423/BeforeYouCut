@@ -1,6 +1,4 @@
-import { TabHeader } from "@/components/nav";
-import SellerDashboardScreen from "@/components/screens/seller-dashboard";
-import { getSellerDashboard } from "@/app/actions";
+import { SellerRoutePage } from "./_SellerRoutePage";
 import siteConfig from "@/site.config";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +9,5 @@ export const metadata = {
 };
 
 export default async function SellerPage() {
-  const dashboard = await getSellerDashboard();
-
-  return (
-    <>
-      <TabHeader title="판매자 센터" bordered />
-      <SellerDashboardScreen dashboard={dashboard} />
-    </>
-  );
+  return SellerRoutePage({ view: "overview" });
 }

@@ -9,6 +9,10 @@ function readSource(path) {
 describe("role-specific UI contracts", () => {
   it("seller center keeps next action and role quick links", () => {
     const source = readSource("src/components/screens/seller-dashboard.js");
+    const sellerPageSource = readSource("src/app/seller/page.js");
+    const productsPageSource = readSource("src/app/seller/products/page.js");
+    const newProductPageSource = readSource("src/app/seller/products/new/page.js");
+    const editProductPageSource = readSource("src/app/seller/products/[productId]/page.js");
 
     expect(source).toContain("getSellerNextTask");
     expect(source).toContain("NEXT ACTION");
@@ -17,8 +21,13 @@ describe("role-specific UI contracts", () => {
     expect(source).toContain("주문 처리");
     expect(source).toContain("정산 확인");
     expect(source).toContain("SellerBottomTabs");
-    expect(source).toContain("activeTab");
+    expect(source).toContain("/seller/products/new");
     expect(source).toContain("settlements");
+    expect(sellerPageSource).toContain("view: \"overview\"");
+    expect(productsPageSource).toContain("view: \"products\"");
+    expect(newProductPageSource).toContain("view: \"productNew\"");
+    expect(editProductPageSource).toContain("view: \"productEdit\"");
+    expect(editProductPageSource).toContain("await params");
   });
 
   it("admin console keeps operating runbook and risk summary", () => {
@@ -40,10 +49,23 @@ describe("role-specific UI contracts", () => {
     expect(pageSource).toContain("getMyAccountSummary");
     expect(screenSource).toContain("ROLE HUB");
     expect(screenSource).toContain("역할별 화면");
+    expect(screenSource).toContain("accountReady");
+    expect(screenSource).toContain("계정 확인중");
+    expect(screenSource).toContain("isSellerAccount");
+    expect(screenSource).toContain("secondary");
     expect(screenSource).toContain("구매자");
     expect(screenSource).toContain("판매자 입점");
     expect(screenSource).toContain("관리자 콘솔");
     expect(screenSource).toContain("배송지");
+  });
+
+  it("test seller bootstrap keeps auth and seller mirror together", () => {
+    const source = readSource("scripts/bootstrap-test-seller.js");
+
+    expect(source).toContain("upsertAuthUser");
+    expect(source).toContain("role: \"SELLER\"");
+    expect(source).toContain("test-seller-account");
+    expect(source).toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it("order detail keeps role-specific buyer seller admin framing", () => {

@@ -1287,8 +1287,9 @@ function accountRoleLabel(role) {
     ADMIN: "관리자",
     SELLER: "판매자",
     BUYER: "구매자",
+    PENDING: "계정 확인중",
   };
-  return labels[role] || "구매자";
+  return labels[role] || "계정 확인중";
 }
 
 function accountKycLabel(status) {
@@ -1326,9 +1327,10 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const [shippingAddress, setShippingAddress] = useState(shippingProfile?.address || "");
   const [shippingAddressDetail, setShippingAddressDetail] = useState(shippingProfile?.addressDetail || "");
   const [shippingSaving, setShippingSaving] = useState(false);
-  const accountRole = accountSummary?.role || "BUYER";
+  const accountRole = accountSummary?.role || (user ? "PENDING" : "BUYER");
   const accountName = accountSummary?.name || user?.email?.split("@")[0] || "";
   const roleLabel = accountRoleLabel(accountRole);
+  const accountReady = !user || Boolean(accountSummary);
   const sellerSummary = accountSummary?.seller || null;
   const isAdmin = accountSummary?.isAdmin || accountRole === "ADMIN";
   const isSellerAccount = accountSummary?.isSeller || Boolean(sellerSummary) || accountRole === "SELLER";
@@ -1559,6 +1561,20 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         footerAction: "로그인",
         footerOnClick: () => setAuthOpen("signin"),
       }
+    : !accountReady
+      ? {
+          kicker: "ACCOUNT",
+          title: "계정 확인중",
+          icon: "user",
+          cards: [
+            { value: "확인중", label: "역할 정보", action: () => router.refresh() },
+            { value: "새로고침", label: "계정 다시 불러오기", action: () => router.refresh() },
+          ],
+          footerTitle: "계정 동기화",
+          footerDesc: "로그인 계정의 구매자, 판매자, 관리자 역할을 확인하고 있습니다.",
+          footerAction: "갱신",
+          footerOnClick: () => router.refresh(),
+        }
     : isAdmin
       ? {
           kicker: "ADMIN ACCOUNT",
@@ -1600,17 +1616,40 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
             footerAction: shippingAddress ? "수정" : "등록",
             footerOnClick: () => setSettingsOpen(true),
           };
-  const roleCards = !user
-    ? [
+  const roleCards = (() => {
+    if (!user) {
+      return [
         { key: "signin", icon: "user", title: "로그인", desc: "주문, 저장, 판매자 센터를 계정과 연결", active: true, action: () => setAuthOpen("signin") },
         { key: "signup", icon: "bag", title: "회원가입", desc: "구매자 계정을 만들고 기본 정보를 저장", action: () => { resetSignupForm(); setAuthOpen("signup"); } },
-      ]
-    : [
-        ...(isAdmin ? [{ key: "admin", icon: "lock", title: "관리자 콘솔", desc: "상품 검수, KYC, 환불, 정산, CS 처리", active: true, admin: true, action: openAdminConsole }] : []),
-        ...(isSellerAccount ? [{ key: "seller", icon: "store", title: "판매자 센터", desc: sellerSummary ? `${sellerSummary.name} · ${sellerStatusText}` : "판매자 정보를 보완해 운영을 시작", active: !isAdmin, action: openSellerCenter }] : []),
-        { key: "buyer", icon: "bag", title: "구매 활동", desc: buyerStatsText, active: !isAdmin && !isSellerAccount, action: () => setHistoryOpen(true) },
-        ...(!isSellerAccount && !isAdmin ? [{ key: "seller-onboarding", icon: "store", title: "판매자 입점", desc: "입점 신청, 상품, 주문, 정산 관리", action: openSellerCenter }] : []),
       ];
+    }
+
+    if (!accountReady) {
+      return [
+        { key: "account-loading", icon: "user", title: "계정 확인중", desc: "로그인 계정의 역할 정보를 불러오고 있습니다.", active: true, pending: true, action: () => router.refresh() },
+      ];
+    }
+
+    if (isAdmin) {
+      return [
+        { key: "admin", icon: "lock", title: "관리자", desc: "상품 검수, KYC, 환불, 정산, CS 처리", active: true, admin: true, action: openAdminConsole },
+        ...(isSellerAccount ? [{ key: "seller", icon: "store", title: "판매자", desc: sellerSummary ? `${sellerSummary.name} · ${sellerStatusText}` : "판매자 센터 연결됨", action: openSellerCenter }] : []),
+        { key: "buyer", icon: "bag", title: "구매자", desc: buyerStatsText, action: () => setHistoryOpen(true) },
+      ];
+    }
+
+    if (isSellerAccount) {
+      return [
+        { key: "seller", icon: "store", title: "판매자", desc: sellerSummary ? `${sellerSummary.name} · ${sellerStatusText}` : "상품, 주문, 정산을 관리", active: true, action: openSellerCenter },
+        { key: "buyer", icon: "bag", title: "구매자", desc: buyerStatsText, secondary: true, action: () => setHistoryOpen(true) },
+      ];
+    }
+
+    return [
+      { key: "buyer", icon: "bag", title: "구매자", desc: buyerStatsText, active: true, action: () => setHistoryOpen(true) },
+      { key: "seller-onboarding", icon: "store", title: "판매자 입점", desc: "입점 신청, 상품, 주문, 정산 관리", action: openSellerCenter },
+    ];
+  })();
 
   return (
     <div className="byc-scroll fadein">
@@ -1700,6 +1739,8 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
                 "account-role-card",
                 card.active ? "active" : "",
                 card.admin ? "admin" : "",
+                card.secondary ? "secondary" : "",
+                card.pending ? "pending" : "",
               ].filter(Boolean).join(" ")}
               onClick={card.action}
             >

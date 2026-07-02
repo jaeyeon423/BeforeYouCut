@@ -57,6 +57,7 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `src/app/layout.js`: root providers and seller map preload.
 - `src/app/page.js`: home route composition.
 - `src/app/seller/page.js`: seller center route.
+- `src/app/seller/_SellerRoutePage.js`: shared seller subpage route wrapper.
 - `src/components/screens/seller-dashboard.js`: seller onboarding, product detail editor, order and settlement dashboard.
 - `src/components/screens/other.js`: search, product detail, seller profile, cart, my page, auth-related screen components.
 - `src/components/screens/home.js`: home hero, rankings, brand rails.
@@ -71,6 +72,7 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `src/utils/supabase/client.js`: browser Supabase client.
 - `src/components/BusinessFooter.js`: legal/business footer.
 - `src/components/IntermediaryNotice.js`: marketplace intermediary notice.
+- `scripts/bootstrap-test-seller.js`: idempotently creates/updates a Supabase Auth + DB seller test account from CLI email/password args.
 
 ## Routes
 
@@ -85,7 +87,13 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `/orders/[id]`: private order detail for the buyer, order-owning seller, or admin; includes shipment registration and refund request surfaces.
 - `/saved`: saved products.
 - `/my`: buyer account page with seller center entry point.
-- `/seller`: seller center. Guest users see login guidance; non-seller users can start seller onboarding; sellers manage details/orders/settlements.
+- `/seller`: seller center overview. Guest users see login guidance; non-seller users can start seller onboarding; sellers see daily next actions and role navigation.
+- `/seller/products`: seller product list and product status overview.
+- `/seller/products/new`: seller product registration flow.
+- `/seller/products/[productId]`: seller-owned product detail editor for buyer-facing detail content.
+- `/seller/orders`: seller order handling list.
+- `/seller/settlements`: seller settlement status list.
+- `/seller/settings`: seller compliance, KYC documents, and settlement account settings.
 - `/admin`: admin console. Requires `User.role === "ADMIN"` or server-only `ADMIN_EMAILS` bootstrap.
 - `/terms`, `/terms/privacy`, `/terms/refund`, `/terms/seller`: legal pages.
 
@@ -164,8 +172,9 @@ Environment and secrets:
 - Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Buyer discovery screens now provide catalog context, filter/sort controls, search suggestions, product rails, and seller trust indicators so browsing feels like a shopping workflow rather than a static list.
 - `/category` now works as a marketplace directory with `카테고리` and `브랜드` tabs, a dense left-side category rail, top filter tabs, constrained desktop width, and right-side icon grids before optional product listing.
-- Seller/admin role screens now emphasize operating cadence: seller center surfaces the next action plus product/compliance/order quick links, while admin console starts with a review/KYC/refund/CS runbook before the detailed queues.
+- Seller/admin role screens now emphasize operating cadence: seller center is split into URL-backed subpages for overview, products, product registration/detail editing, orders, settlements, and compliance/settings, while admin console starts with a review/KYC/refund/CS runbook before the detailed queues.
 - `/my` is the role-switching account hub: buyer stats stay focused on orders/saved items/shipping address, while seller/admin entry cards are separated and driven by server-loaded DB role/account summary.
+- `/my` does not assume logged-in users are buyers while account summary is missing; it shows a neutral account-sync state, then renders buyer/seller/admin cards from `User.role` and linked `Seller`.
 - `/orders/[id]` is shared by buyer/seller/admin but now frames the same order differently per role: buyer sees order/shipping/refund confidence, seller sees shipment and settlement-relevant handling, admin sees operational risk checks.
 - Direct order creation is disabled; orders are created only after PG confirmation.
 - Order status changes now sync settlement status: `구매확정` moves pending settlements to `CONFIRMED`, while `취소`/`환불완료` moves unpaid settlements to `CANCELED`; admins can mark confirmed settlements as `PAID`.

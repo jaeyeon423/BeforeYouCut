@@ -1301,6 +1301,16 @@ a, .pcard, .rankrow, .brandcell {
   border-color: rgba(22, 93, 143, 0.24);
   background: rgba(22, 93, 143, 0.045);
 }
+.account-role-card.secondary {
+  background: #fff;
+}
+.account-role-card.secondary svg,
+.account-role-card.secondary span {
+  color: var(--muted-2);
+}
+.account-role-card.pending {
+  cursor: progress;
+}
 
 .foot-note { padding: 40px 18px 30px; color: var(--muted-2); font-size: 11px; line-height: 1.6; }
 .foot-note b { color: var(--muted); font-weight: 700; }

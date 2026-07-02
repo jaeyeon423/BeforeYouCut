@@ -92,7 +92,7 @@ async function uploadSellerDocument(file, sellerId, type) {
   return path;
 }
 
-export default function SellerDashboardScreen({ dashboard }) {
+export default function SellerDashboardScreen({ dashboard, view = "overview", selectedProductId = null }) {
   if (dashboard.status === "guest") {
     return (
       <AccessPanel
@@ -119,15 +119,12 @@ export default function SellerDashboardScreen({ dashboard }) {
     );
   }
 
-  return <SellerWorkspace dashboard={dashboard} />;
+  return <SellerWorkspace dashboard={dashboard} view={view} selectedProductId={selectedProductId} />;
 }
 
-function SellerWorkspace({ dashboard }) {
+function SellerWorkspace({ dashboard, view = "overview", selectedProductId = null }) {
   const { seller, bankAccount = null, compliance = {}, documentLinks = {}, products = [], orders = [], settlements = [], stats = {} } = dashboard;
-  const [selectedId, setSelectedId] = useState(products[0]?.id || null);
-  const [newProductOpen, setNewProductOpen] = useState(products.length === 0);
-  const [activeTab, setActiveTab] = useState("overview");
-  const selected = products.find((p) => p.id === selectedId) || products[0] || null;
+  const selected = products.find((p) => p.id === selectedProductId) || null;
   const pendingReviewProducts = products.filter((product) => product.reviewStatus === "PENDING").length;
   const rejectedProducts = products.filter((product) => product.reviewStatus === "REJECTED").length;
   const complianceIssueCount = compliance.issues?.length || 0;
@@ -142,27 +139,26 @@ function SellerWorkspace({ dashboard }) {
   });
   const attentionCount = (stats.pendingOrders || 0) + pendingReviewProducts + rejectedProducts + complianceIssueCount;
   const sellerTabs = [
-    { id: "overview", label: "오늘", icon: "grid", badge: attentionCount ? String(attentionCount) : "" },
-    { id: "products", label: "상품", icon: "store", badge: products.length ? String(products.length) : "" },
-    { id: "orders", label: "주문", icon: "ship", badge: stats.pendingOrders ? String(stats.pendingOrders) : "" },
-    { id: "settlements", label: "정산", icon: "trend", badge: stats.pendingSettlement ? "원" : "" },
-    { id: "compliance", label: "정보", icon: "lock", badge: complianceIssueCount ? String(complianceIssueCount) : "" },
+    { id: "overview", href: "/seller", label: "오늘", icon: "grid", badge: attentionCount ? String(attentionCount) : "" },
+    { id: "products", href: "/seller/products", label: "상품", icon: "store", badge: products.length ? String(products.length) : "" },
+    { id: "orders", href: "/seller/orders", label: "주문", icon: "ship", badge: stats.pendingOrders ? String(stats.pendingOrders) : "" },
+    { id: "settlements", href: "/seller/settlements", label: "정산", icon: "trend", badge: stats.pendingSettlement ? "원" : "" },
+    { id: "settings", href: "/seller/settings", label: "정보", icon: "lock", badge: complianceIssueCount ? String(complianceIssueCount) : "" },
   ];
   const quickActions = [
-    { tab: "products", label: "상품 등록/수정", desc: products.length > 0 ? `${products.length}개 상품 관리` : "첫 상품 등록 필요" },
-    { tab: "compliance", label: "운영 정보", desc: seller.kycStatus === "APPROVED" ? "심사 승인 상태" : `${complianceIssueCount}개 확인 필요` },
-    { tab: "orders", label: "주문 처리", desc: `${stats.pendingOrders || 0}건 처리 대기` },
-    { tab: "settlements", label: "정산 확인", desc: `${won(stats.pendingSettlement || 0)}원 예정` },
+    { href: "/seller/products", label: "상품 등록/수정", desc: products.length > 0 ? `${products.length}개 상품 관리` : "첫 상품 등록 필요" },
+    { href: "/seller/settings", label: "운영 정보", desc: seller.kycStatus === "APPROVED" ? "심사 승인 상태" : `${complianceIssueCount}개 확인 필요` },
+    { href: "/seller/orders", label: "주문 처리", desc: `${stats.pendingOrders || 0}건 처리 대기` },
+    { href: "/seller/settlements", label: "정산 확인", desc: `${won(stats.pendingSettlement || 0)}원 예정` },
     { href: `/sellers/${seller.id}`, label: "공개 페이지", desc: "구매자 노출 확인", external: true },
   ];
   const processSteps = [
-    { label: "운영 준비", desc: seller.kycStatus === "APPROVED" ? "승인" : "확인 필요", tab: "compliance", done: seller.kycStatus === "APPROVED" && complianceIssueCount === 0 },
-    { label: "상품 구성", desc: products.length ? `${products.length}개` : "첫 등록", tab: "products", done: products.length > 0 && rejectedProducts === 0 },
-    { label: "주문 처리", desc: `${stats.pendingOrders || 0}건`, tab: "orders", done: (stats.pendingOrders || 0) === 0 },
-    { label: "정산 확인", desc: `${won(stats.pendingSettlement || 0)}원`, tab: "settlements", done: (stats.pendingSettlement || 0) === 0 },
+    { label: "운영 준비", desc: seller.kycStatus === "APPROVED" ? "승인" : "확인 필요", href: "/seller/settings", active: view === "settings", done: seller.kycStatus === "APPROVED" && complianceIssueCount === 0 },
+    { label: "상품 구성", desc: products.length ? `${products.length}개` : "첫 등록", href: "/seller/products", active: ["products", "productNew", "productEdit"].includes(view), done: products.length > 0 && rejectedProducts === 0 },
+    { label: "주문 처리", desc: `${stats.pendingOrders || 0}건`, href: "/seller/orders", active: view === "orders", done: (stats.pendingOrders || 0) === 0 },
+    { label: "정산 확인", desc: `${won(stats.pendingSettlement || 0)}원`, href: "/seller/settlements", active: view === "settlements", done: (stats.pendingSettlement || 0) === 0 },
   ];
-
-  const goTab = (tab) => setActiveTab(tab);
+  const activeNavId = ["productNew", "productEdit"].includes(view) ? "products" : view;
 
   return (
     <div className="byc-scroll fadein" style={styles.workspace}>
@@ -190,23 +186,22 @@ function SellerWorkspace({ dashboard }) {
       <section style={styles.sectionCompact}>
         <div style={styles.processRail}>
           {processSteps.map((step, index) => (
-            <button
+            <Link
               key={step.label}
-              type="button"
-              onClick={() => goTab(step.tab)}
-              style={activeTab === step.tab ? { ...styles.processStep, ...styles.processStepActive } : styles.processStep}
+              href={step.href}
+              style={step.active ? { ...styles.processStep, ...styles.processStepActive } : styles.processStep}
             >
               <span style={step.done ? { ...styles.processDot, ...styles.processDotDone } : styles.processDot}>{index + 1}</span>
               <span style={styles.processText}>
                 <b>{step.label}</b>
                 <small>{step.desc}</small>
               </span>
-            </button>
+            </Link>
           ))}
         </div>
       </section>
 
-      {activeTab === "overview" && (
+      {view === "overview" && (
         <>
           <section style={styles.sectionCompact}>
             <div style={styles.nextPanel}>
@@ -215,13 +210,11 @@ function SellerWorkspace({ dashboard }) {
                 <h2 style={styles.nextTitle}>{nextTask.title}</h2>
                 <p style={styles.nextDesc}>{nextTask.desc}</p>
               </div>
-              <button type="button" onClick={() => goTab(nextTask.tab)} style={styles.nextButton}>{nextTask.action}</button>
+              <Link href={nextTask.href} style={styles.nextButton}>{nextTask.action}</Link>
             </div>
             <div style={styles.quickGrid}>
               {quickActions.map((item) => (
-                item.external
-                  ? <Link key={item.label} href={item.href} style={styles.quickAction}><b>{item.label}</b><span style={styles.quickActionDesc}>{item.desc}</span></Link>
-                  : <button key={item.label} type="button" onClick={() => goTab(item.tab)} style={styles.quickAction}><b>{item.label}</b><span style={styles.quickActionDesc}>{item.desc}</span></button>
+                <Link key={item.label} href={item.href} style={styles.quickAction}><b>{item.label}</b><span style={styles.quickActionDesc}>{item.desc}</span></Link>
               ))}
             </div>
           </section>
@@ -261,57 +254,54 @@ function SellerWorkspace({ dashboard }) {
         </>
       )}
 
-      {activeTab === "products" && (
+      {view === "products" && (
         <section style={styles.section}>
           <div style={styles.sectionHeaderRow}>
             <SectionTitle
-              title="상품"
-              desc="등록, 검수 상태, 구매자 상세페이지를 한 곳에서 관리합니다."
+              title="상품 목록"
+              desc="상품 상태를 확인하고 상세 수정 페이지로 이동합니다."
             />
-            <button type="button" onClick={() => setNewProductOpen((value) => !value)} style={styles.ghostButton}>
-              {newProductOpen ? "닫기" : "새 상품"}
-            </button>
+            <Link href="/seller/products/new" style={styles.ghostButton}>새 상품</Link>
           </div>
+          <SellerProductList products={products} />
+        </section>
+      )}
 
-          {newProductOpen && (
-            <NewProductForm
-              seller={seller}
-              onCreated={(product) => {
-                setSelectedId(product.id);
-                setNewProductOpen(false);
-              }}
+      {view === "productNew" && (
+        <section style={styles.section}>
+          <div style={styles.sectionHeaderRow}>
+            <SectionTitle
+              title="상품 등록"
+              desc="판매 정보, 대표 이미지, 상품정보고시를 순서대로 입력합니다."
             />
-          )}
+            <Link href="/seller/products" style={styles.ghostButton}>목록</Link>
+          </div>
+          <NewProductForm seller={seller} />
+        </section>
+      )}
 
-          {products.length > 0 ? (
-            <>
-              <div style={styles.productTabs}>
-                {products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSelectedId(p.id)}
-                    style={selected?.id === p.id ? { ...styles.productTab, ...styles.productTabActive } : styles.productTab}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-              {selected && <ProductDetailComposer key={selected.id} product={selected} />}
-            </>
+      {view === "productEdit" && (
+        <section style={styles.section}>
+          <div style={styles.sectionHeaderRow}>
+            <SectionTitle
+              title="상품 상세 수정"
+              desc="구매자가 보는 상품 상세페이지 내용을 보완합니다."
+            />
+            <Link href="/seller/products" style={styles.ghostButton}>목록</Link>
+          </div>
+          {selected ? (
+            <ProductDetailComposer key={selected.id} product={selected} />
           ) : (
-            !newProductOpen && (
-              <EmptyPanel
-                icon="store"
-                title="등록된 상품이 없습니다"
-                desc="첫 상품을 등록하면 상세페이지 편집 도구가 열립니다."
-              />
-            )
+            <EmptyPanel
+              icon="store"
+              title="상품을 찾지 못했습니다"
+              desc="상품 목록에서 다시 선택해 주세요."
+            />
           )}
         </section>
       )}
 
-      {activeTab === "orders" && (
+      {view === "orders" && (
         <section style={styles.section}>
           <SectionTitle title="주문" desc="배송 처리가 필요한 주문을 확인합니다." />
           <Panel title="최근 주문">
@@ -333,7 +323,7 @@ function SellerWorkspace({ dashboard }) {
         </section>
       )}
 
-      {activeTab === "settlements" && (
+      {view === "settlements" && (
         <section style={styles.section}>
           <SectionTitle title="정산" desc="구매확정 이후 정산 예정 금액과 지급 상태를 확인합니다." />
           <Panel title="정산 상태">
@@ -355,7 +345,7 @@ function SellerWorkspace({ dashboard }) {
         </section>
       )}
 
-      {activeTab === "compliance" && (
+      {view === "settings" && (
         <section style={styles.section}>
           <SectionTitle
             title="운영 정보"
@@ -365,7 +355,43 @@ function SellerWorkspace({ dashboard }) {
         </section>
       )}
 
-      <SellerBottomTabs tabs={sellerTabs} activeTab={activeTab} onChange={goTab} />
+      <SellerBottomTabs tabs={sellerTabs} activeNavId={activeNavId} />
+    </div>
+  );
+}
+
+function SellerProductList({ products }) {
+  if (products.length === 0) {
+    return (
+      <div style={styles.productListEmpty}>
+        <EmptyPanel
+          icon="store"
+          title="등록된 상품이 없습니다"
+          desc="첫 상품을 등록하면 검수 대기 상태로 저장됩니다."
+        />
+        <Link href="/seller/products/new" className="buy" style={styles.emptyAction}>첫 상품 등록</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.productList}>
+      {products.map((product) => (
+        <div key={product.id} style={styles.productListItem}>
+          <div style={styles.productListMedia}>
+            <ProductMedia p={product} size={34} />
+          </div>
+          <div style={styles.productListInfo}>
+            <div style={styles.rowTitle}>{product.name}</div>
+            <div style={styles.rowMeta}>{product.cat} · {won(product.price)}원</div>
+            <p style={styles.productListDesc}>{product.desc}</p>
+          </div>
+          <div style={styles.productListSide}>
+            <StatusPill>{product.reviewStatus === "APPROVED" ? "공개 가능" : product.reviewStatus === "REJECTED" ? "보완 필요" : "검수 대기"}</StatusPill>
+            <Link href={`/seller/products/${product.id}`} style={styles.inlineLink}>상세 수정</Link>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -376,7 +402,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "운영 정보부터 보완",
       desc: "입점 심사와 정산 계좌가 정리되어야 실제 판매 운영이 안정적으로 진행됩니다.",
       action: "운영 정보 확인",
-      tab: "compliance",
+      href: "/seller/settings",
     };
   }
 
@@ -385,7 +411,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "첫 상품 등록",
       desc: "상품명, 가격, 이미지, 상세 정보까지 입력해야 구매자 화면이 비어 보이지 않습니다.",
       action: "상품 등록",
-      tab: "products",
+      href: "/seller/products/new",
     };
   }
 
@@ -394,7 +420,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "반려 상품 보완",
       desc: "관리자 검수에서 반려된 상품은 상세 정보와 필수 고시를 먼저 보완해야 합니다.",
       action: "상품 수정",
-      tab: "products",
+      href: "/seller/products",
     };
   }
 
@@ -403,7 +429,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "검수 대기 상품 확인",
       desc: "승인 전 상품은 공개되지 않으므로 상세 미리보기와 필수 정보를 한 번 더 확인하세요.",
       action: "상품 상태 보기",
-      tab: "products",
+      href: "/seller/products",
     };
   }
 
@@ -412,7 +438,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "배송 처리",
       desc: "처리 대기 주문은 주문 상세에서 송장 정보를 등록해 구매자 불안을 줄여야 합니다.",
       action: "주문 확인",
-      tab: "orders",
+      href: "/seller/orders",
     };
   }
 
@@ -421,7 +447,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
       title: "정산 상태 확인",
       desc: "구매확정 이후 정산 예정 금액과 지급 상태를 확인하세요.",
       action: "정산 확인",
-      tab: "settlements",
+      href: "/seller/settlements",
     };
   }
 
@@ -429,7 +455,7 @@ function getSellerNextTask({ seller, products, pendingReviewProducts, rejectedPr
     title: "공개 페이지 점검",
     desc: "구매자가 보는 브랜드 설명, 상품 카드, 상세페이지를 주기적으로 확인합니다.",
     action: "상품 관리",
-    tab: "products",
+    href: "/seller/products",
   };
 }
 
@@ -503,6 +529,7 @@ function NewProductForm({ seller, onCreated }) {
         setMessage("상품이 등록되었습니다. 상세페이지 편집 목록에 반영됩니다.");
         reset();
         onCreated?.(result.product);
+        router.push(`/seller/products/${result.product.id}`);
         router.refresh();
       } catch (error) {
         setMessage(error.message || "상품 등록에 실패했습니다.");
@@ -1212,16 +1239,15 @@ function SellerQueueCard({ label, value, desc, tone = "neutral" }) {
   );
 }
 
-function SellerBottomTabs({ tabs, activeTab, onChange }) {
+function SellerBottomTabs({ tabs, activeNavId }) {
   return (
     <nav style={styles.sellerBottomTabs} aria-label="판매자 센터 탭">
       {tabs.map((tab) => {
-        const active = activeTab === tab.id;
+        const active = activeNavId === tab.id;
         return (
-          <button
+          <Link
             key={tab.id}
-            type="button"
-            onClick={() => onChange(tab.id)}
+            href={tab.href}
             style={active ? { ...styles.sellerBottomTab, ...styles.sellerBottomTabActive } : styles.sellerBottomTab}
             aria-current={active ? "page" : undefined}
           >
@@ -1230,7 +1256,7 @@ function SellerBottomTabs({ tabs, activeTab, onChange }) {
               {tab.badge && <em style={styles.bottomTabBadge}>{tab.badge}</em>}
             </span>
             <span>{tab.label}</span>
-          </button>
+          </Link>
         );
       })}
     </nav>
@@ -1328,6 +1354,7 @@ const styles = {
     fontFamily: "inherit",
     cursor: "pointer",
     textAlign: "left",
+    textDecoration: "none",
   },
   processStepActive: { border: "1px solid var(--ink)", boxShadow: "inset 0 0 0 1px var(--ink)" },
   processDot: {
@@ -1375,6 +1402,32 @@ const styles = {
     cursor: "pointer",
   },
   productTabActive: { background: "var(--ink)", color: "#fff", border: "1px solid var(--ink)" },
+  productList: { display: "flex", flexDirection: "column", gap: 10 },
+  productListItem: {
+    display: "grid",
+    gridTemplateColumns: "54px minmax(0, 1fr) auto",
+    gap: 11,
+    alignItems: "center",
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 11,
+  },
+  productListMedia: { width: 54, height: 64, borderRadius: 8, overflow: "hidden", background: "var(--surface)" },
+  productListInfo: { minWidth: 0 },
+  productListDesc: {
+    margin: "6px 0 0",
+    fontSize: 11.5,
+    lineHeight: 1.45,
+    color: "var(--ink-soft)",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+  },
+  productListSide: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 },
+  productListEmpty: { display: "flex", flexDirection: "column", gap: 12 },
+  emptyAction: { width: "100%", textAlign: "center", textDecoration: "none" },
   composer: { display: "flex", flexDirection: "column", gap: 12 },
   createPanel: {
     display: "flex",
@@ -1559,6 +1612,9 @@ const styles = {
   },
   specHead: { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 4 },
   ghostButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     border: "1px solid var(--line)",
     background: "#fff",
     borderRadius: 6,
@@ -1567,6 +1623,7 @@ const styles = {
     fontWeight: 800,
     color: "var(--ink)",
     cursor: "pointer",
+    textDecoration: "none",
   },
   specList: { display: "flex", flexDirection: "column", gap: 8 },
   specRow: { display: "grid", gridTemplateColumns: "120px 1fr", gap: 8 },
@@ -1660,6 +1717,7 @@ const styles = {
     fontWeight: 850,
     fontFamily: "inherit",
     cursor: "pointer",
+    textDecoration: "none",
   },
   sellerBottomTabActive: {
     color: "var(--ink)",
