@@ -1331,6 +1331,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const roleLabel = accountRoleLabel(accountRole);
   const sellerSummary = accountSummary?.seller || null;
   const isAdmin = accountSummary?.isAdmin || accountRole === "ADMIN";
+  const isSellerAccount = accountSummary?.isSeller || Boolean(sellerSummary) || accountRole === "SELLER";
   const savedShippingLabel = shippingAddress ? "저장" : "미등록";
   // 회원가입 약관 동의 상태
   const [consentTerms, setConsentTerms] = useState(false);
@@ -1532,7 +1533,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const menuItems = [
     { label: "주문 내역", action: () => setHistoryOpen(true) },
     { label: "저장한 도구", action: () => router.push("/saved") },
-    { label: "판매자 센터", action: openSellerCenter },
+    { label: sellerSummary ? "판매자 센터" : "판매자 입점", action: openSellerCenter },
     ...(isAdmin ? [{ label: "관리자 콘솔", action: openAdminConsole }] : []),
     { label: "고객센터", action: () => {} },
     { label: "설정", action: () => {
@@ -1540,6 +1541,76 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
       setSettingsOpen(true);
     } },
   ];
+  const buyerStatsText = `${orders.length}건 주문 · ${likes.size}개 저장`;
+  const sellerStatusText = sellerSummary
+    ? `${sellerSummary.productsCount || 0}개 상품 · ${accountKycLabel(sellerSummary.kycStatus)}`
+    : "입점 신청 전";
+  const accountFocus = !user
+    ? {
+        kicker: "ACCOUNT",
+        title: "로그인 후 이용 가능",
+        icon: "user",
+        cards: [
+          { value: "로그인", label: "내 주문/저장 확인", action: () => setAuthOpen("signin") },
+          { value: "가입", label: "구매자 계정 생성", action: () => { resetSignupForm(); setAuthOpen("signup"); } },
+        ],
+        footerTitle: "계정 연결",
+        footerDesc: "로그인하면 주문, 저장 상품, 기본 배송지와 역할별 화면이 계정에 맞게 표시됩니다.",
+        footerAction: "로그인",
+        footerOnClick: () => setAuthOpen("signin"),
+      }
+    : isAdmin
+      ? {
+          kicker: "ADMIN ACCOUNT",
+          title: "운영 관리",
+          icon: "lock",
+          cards: [
+            { value: "검수", label: "상품·입점 확인", action: openAdminConsole },
+            { value: "CS", label: "환불·문의 처리", action: openAdminConsole },
+          ],
+          footerTitle: "관리자 콘솔",
+          footerDesc: "상품 검수, KYC, 환불, 정산, 고객 문의를 운영 기준에 따라 확인합니다.",
+          footerAction: "열기",
+          footerOnClick: openAdminConsole,
+        }
+      : isSellerAccount
+        ? {
+            kicker: "SELLER ACCOUNT",
+            title: "판매 운영",
+            icon: "store",
+            cards: [
+              { value: `${sellerSummary?.productsCount || 0}개`, label: "등록 상품", action: openSellerCenter },
+              { value: accountKycLabel(sellerSummary?.kycStatus), label: "입점/운영 상태", action: openSellerCenter },
+            ],
+            footerTitle: sellerSummary?.name || "판매자 센터",
+            footerDesc: sellerSummary ? sellerStatusText : "판매자 정보를 보완하고 상품, 주문, 정산을 관리합니다.",
+            footerAction: "관리",
+            footerOnClick: openSellerCenter,
+          }
+        : {
+            kicker: "BUYER ACCOUNT",
+            title: "구매 정보",
+            icon: "bag",
+            cards: [
+              { value: `${orders.length}건`, label: "주문 내역", action: () => setHistoryOpen(true) },
+              { value: `${likes.size}개`, label: "저장 상품", action: () => router.push("/saved") },
+            ],
+            footerTitle: "기본 배송지",
+            footerDesc: shippingAddress ? composeShippingAddress(shippingAddress, shippingAddressDetail) : "저장된 배송지가 없습니다",
+            footerAction: shippingAddress ? "수정" : "등록",
+            footerOnClick: () => setSettingsOpen(true),
+          };
+  const roleCards = !user
+    ? [
+        { key: "signin", icon: "user", title: "로그인", desc: "주문, 저장, 판매자 센터를 계정과 연결", active: true, action: () => setAuthOpen("signin") },
+        { key: "signup", icon: "bag", title: "회원가입", desc: "구매자 계정을 만들고 기본 정보를 저장", action: () => { resetSignupForm(); setAuthOpen("signup"); } },
+      ]
+    : [
+        ...(isAdmin ? [{ key: "admin", icon: "lock", title: "관리자 콘솔", desc: "상품 검수, KYC, 환불, 정산, CS 처리", active: true, admin: true, action: openAdminConsole }] : []),
+        ...(isSellerAccount ? [{ key: "seller", icon: "store", title: "판매자 센터", desc: sellerSummary ? `${sellerSummary.name} · ${sellerStatusText}` : "판매자 정보를 보완해 운영을 시작", active: !isAdmin, action: openSellerCenter }] : []),
+        { key: "buyer", icon: "bag", title: "구매 활동", desc: buyerStatsText, active: !isAdmin && !isSellerAccount, action: () => setHistoryOpen(true) },
+        ...(!isSellerAccount && !isAdmin ? [{ key: "seller-onboarding", icon: "store", title: "판매자 입점", desc: "입점 신청, 상품, 주문, 정산 관리", action: openSellerCenter }] : []),
+      ];
 
   return (
     <div className="byc-scroll fadein">
@@ -1588,31 +1659,26 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
       <div className="account-focus-card">
         <div className="account-focus-head">
           <div>
-            <div className="account-focus-kicker">BUYER ACCOUNT</div>
-            <h2>구매 정보</h2>
+            <div className="account-focus-kicker">{accountFocus.kicker}</div>
+            <h2>{accountFocus.title}</h2>
           </div>
-          <Icon name="bag" size={22} />
+          <Icon name={accountFocus.icon} size={22} />
         </div>
         <div className="account-focus-grid">
-          <button type="button" onClick={() => setHistoryOpen(true)}>
-            <b>{orders.length}건</b>
-            <span>주문 내역</span>
-          </button>
-          <button type="button" onClick={() => router.push("/saved")}>
-            <b>{likes.size}개</b>
-            <span>저장 상품</span>
-          </button>
+          {accountFocus.cards.map((card) => (
+            <button key={card.label} type="button" onClick={card.action}>
+              <b>{card.value}</b>
+              <span>{card.label}</span>
+            </button>
+          ))}
         </div>
         <div className="account-address-row">
           <div>
-            <b>기본 배송지</b>
-            <span>{shippingAddress ? composeShippingAddress(shippingAddress, shippingAddressDetail) : "저장된 배송지가 없습니다"}</span>
+            <b>{accountFocus.footerTitle}</b>
+            <span>{accountFocus.footerDesc}</span>
           </div>
-          <button type="button" onClick={() => {
-            if (!user) { setAuthOpen("signin"); return; }
-            setSettingsOpen(true);
-          }}>
-            {shippingAddress ? "수정" : "등록"}
+          <button type="button" onClick={accountFocus.footerOnClick}>
+            {accountFocus.footerAction}
           </button>
         </div>
       </div>
@@ -1626,23 +1692,22 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
           <span>{user ? roleLabel : "게스트"}</span>
         </div>
         <div className="account-role-grid">
-          <button type="button" className="account-role-card active" onClick={() => setHistoryOpen(true)}>
-            <Icon name="bag" size={19} />
-            <b>구매자</b>
-            <span>{orders.length}건 주문 · {likes.size}개 저장</span>
-          </button>
-          <button type="button" className="account-role-card" onClick={openSellerCenter}>
-            <Icon name="store" size={19} />
-            <b>{sellerSummary ? "판매자 센터" : "판매자 입점"}</b>
-            <span>{sellerSummary ? `${sellerSummary.name} · ${accountKycLabel(sellerSummary.kycStatus)}` : "입점 신청, 상품, 주문, 정산 관리"}</span>
-          </button>
-          {isAdmin && (
-            <button type="button" className="account-role-card admin" onClick={openAdminConsole}>
-              <Icon name="lock" size={19} />
-              <b>관리자 콘솔</b>
-              <span>상품 검수, KYC, 환불, 정산, CS 처리</span>
+          {roleCards.map((card) => (
+            <button
+              key={card.key}
+              type="button"
+              className={[
+                "account-role-card",
+                card.active ? "active" : "",
+                card.admin ? "admin" : "",
+              ].filter(Boolean).join(" ")}
+              onClick={card.action}
+            >
+              <Icon name={card.icon} size={19} />
+              <b>{card.title}</b>
+              <span>{card.desc}</span>
             </button>
-          )}
+          ))}
         </div>
       </div>
 
