@@ -473,7 +473,7 @@ function NewProductForm({ seller, onCreated }) {
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
     setName("");
@@ -508,33 +508,35 @@ function NewProductForm({ seller, onCreated }) {
     },
   ];
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
     setMessage("");
-    startTransition(async () => {
-      try {
-        const uploadedImageUrl = imageFile ? await uploadProductImage(imageFile, seller.id) : "";
-        const result = await createSellerProduct({
-          name,
-          category,
-          price: Number(price),
-          desc,
-          material,
-          origin,
-          size,
-          care,
-          kcStatus,
-          imageUrl: uploadedImageUrl || imageUrl,
-        });
-        setMessage("상품이 등록되었습니다. 상세페이지 편집 목록에 반영됩니다.");
-        reset();
-        onCreated?.(result.product);
-        router.push(`/seller/products/${result.product.id}`);
-        router.refresh();
-      } catch (error) {
-        setMessage(error.message || "상품 등록에 실패했습니다.");
-      }
-    });
+    setIsSubmitting(true);
+    try {
+      const uploadedImageUrl = imageFile ? await uploadProductImage(imageFile, seller.id) : "";
+      const result = await createSellerProduct({
+        name,
+        category,
+        price: Number(price),
+        desc,
+        material,
+        origin,
+        size,
+        care,
+        kcStatus,
+        imageUrl: uploadedImageUrl || imageUrl,
+      });
+      const nextHref = `/seller/products/${result.product.id}`;
+      setMessage("상품이 등록되었습니다. 상세페이지 편집 화면으로 이동합니다.");
+      reset();
+      onCreated?.(result.product);
+      setIsSubmitting(false);
+      router.push(nextHref);
+    } catch (error) {
+      setMessage(error.message || "상품 등록에 실패했습니다.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -645,8 +647,8 @@ function NewProductForm({ seller, onCreated }) {
       </div>
 
       {message && <div style={styles.message}>{message}</div>}
-      <button className="buy" type="submit" disabled={isPending} style={styles.submitButton}>
-        {isPending ? "등록 중..." : "검수 대기 상품 등록"}
+      <button className="buy" type="submit" disabled={isSubmitting} style={styles.submitButton}>
+        {isSubmitting ? "등록 중..." : "검수 대기 상품 등록"}
       </button>
     </form>
   );
