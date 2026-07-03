@@ -25,7 +25,7 @@ import {
   formatSeller,
   normalizeProductImages,
 } from "@/server/services/catalog-service";
-import { cancelTossPayment, settlePaidPaymentWithOrder } from "@/server/services/payment-service";
+import { cancelTossPayment, confirmReadyTossPayment } from "@/server/services/payment-service";
 
 // ============================================================
 //  Internal formatters & helpers (not exported → not server actions)
@@ -301,7 +301,6 @@ const PHONE_VERIFICATION_TTL_MS = 5 * 60 * 1000;
 const PHONE_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
 const PHONE_VERIFICATION_MAX_ATTEMPTS = 5;
 const TOSS_SDK_URL = "https://js.tosspayments.com/v2/standard";
-const TOSS_CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
 
 function isConfiguredAdminEmail(email) {
   return Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase()));
@@ -350,10 +349,6 @@ function formatOrderItem(item) {
 
 function getTossClientKey() {
   return process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
-}
-
-function getTossSecretKey() {
-  return process.env.TOSS_SECRET_KEY || "";
 }
 
 function createProviderOrderId() {
@@ -443,25 +438,6 @@ async function buildCheckoutLines({ total, items }) {
 function buildOrderName(lines) {
   const firstName = lines[0]?.productName || "미용사 상품";
   return lines.length > 1 ? `${firstName} 외 ${lines.length - 1}건` : firstName;
-}
-
-async function confirmTossPayment({ paymentKey, orderId, amount }) {
-  const secretKey = getTossSecretKey();
-  if (!secretKey) throw new Error("TOSS_SECRET_KEY 환경변수를 설정해야 결제를 승인할 수 있습니다.");
-  const encodedAuth = Buffer.from(`${secretKey}:`).toString("base64");
-  const response = await fetch(TOSS_CONFIRM_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${encodedAuth}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ paymentKey, orderId, amount }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.message || "토스페이먼츠 결제 승인에 실패했습니다.");
-  }
-  return payload;
 }
 
 function mergePaymentRefundResponse(existingRawResponse, refundCancelResponse) {
@@ -1236,7 +1212,7 @@ export async function prepareCheckout({ name, phone, address, total, items, orig
       customerName: name.trim(),
       customerEmail: authUser.email || "",
       customerMobilePhone: cleanPhone.replace(/\D/g, ""),
-      successUrl: `${checkoutOrigin}/checkout/success`,
+      successUrl: `${checkoutOrigin}/checkout/confirm`,
       failUrl: `${checkoutOrigin}/checkout/fail`,
     };
   } catch (error) {
@@ -1248,47 +1224,12 @@ export async function prepareCheckout({ name, phone, address, total, items, orig
 export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
   try {
     const authUser = await getAuthUser();
-    const cleanPaymentKey = cleanText(paymentKey);
-    const cleanProviderOrderId = cleanText(providerOrderId);
-    const numericAmount = Number(amount);
-    if (!cleanPaymentKey || !cleanProviderOrderId || !Number.isFinite(numericAmount)) {
-      throw new Error("결제 승인 정보가 올바르지 않습니다.");
-    }
-
-    const payment = await prisma.payment.findUnique({
-      where: { providerOrderId: cleanProviderOrderId },
-      include: { order: true },
+    return await confirmReadyTossPayment({
+      paymentKey,
+      providerOrderId,
+      amount,
+      authUserId: authUser?.id,
     });
-    if (!payment || (authUser?.id && payment.userId !== authUser.id)) throw new Error("결제 요청을 찾을 수 없습니다.");
-    if (payment.status === "PAID" && payment.order) {
-      return { success: true, orderId: payment.order.id, alreadyConfirmed: true };
-    }
-    if (payment.status !== "READY") throw new Error("이미 처리된 결제 요청입니다.");
-    if (payment.amount !== Math.round(numericAmount)) {
-      throw new Error("결제 금액이 서버에 저장된 금액과 일치하지 않습니다.");
-    }
-
-    const tossPayment = await confirmTossPayment({
-      paymentKey: cleanPaymentKey,
-      orderId: cleanProviderOrderId,
-      amount: payment.amount,
-    });
-    if (tossPayment.status && tossPayment.status !== "DONE") {
-      throw new Error("결제가 완료 상태가 아닙니다.");
-    }
-
-    const approvedAt = tossPayment.approvedAt ? new Date(tossPayment.approvedAt) : null;
-    const order = await settlePaidPaymentWithOrder({
-      paymentId: payment.id,
-      activeUserId: payment.userId,
-      paymentKey: cleanPaymentKey,
-      rawResponse: tossPayment,
-      approvedAt: approvedAt && !Number.isNaN(approvedAt.getTime()) ? approvedAt : undefined,
-    });
-
-    // This action is invoked from the Toss success page render path. Order reads
-    // are private, uncached DB queries, so avoid revalidateTag during render.
-    return { success: true, orderId: order.id };
   } catch (error) {
     console.error("Failed to confirm checkout:", error);
     throw new Error(error.message || "결제 승인에 실패했습니다.");

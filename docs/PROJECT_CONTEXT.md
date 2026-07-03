@@ -83,7 +83,8 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `/sellers`: seller/brand list.
 - `/sellers/[id]`: public seller profile.
 - `/cart`: cart/checkout flow.
-- `/checkout/success`, `/checkout/fail`: Toss Payments redirect handlers; success confirms payment server-side and creates the order.
+- `/checkout/confirm`: Toss Payments success redirect handler; confirms payment server-side, creates the order, then redirects to the display page.
+- `/checkout/success`, `/checkout/fail`: checkout result display pages. `success` is display-only and keeps legacy Toss query redirects compatible with `/checkout/confirm`.
 - `/orders/[id]`: private order detail for the buyer, order-owning seller, or admin; includes shipment registration and refund request surfaces.
 - `/saved`: saved products.
 - `/my`: buyer account page with seller center entry point.
@@ -160,9 +161,9 @@ Environment and secrets:
 - `/admin` now provides a first-pass operations console: seller verify/hide, KYC review, product approve/reject/hide, order status update, refund approve/reject/complete handling, settlement confirm/pay/exclude handling, and CS reply/close handling. Admin writes create `AuditLog` records.
 - Buyer-facing product and seller inquiry modals now create real `CsInquiry` rows instead of showing local-only placeholder success messages.
 - `/orders/[id]` now provides a shared private order detail page. Buyers can view shipment/refund state and request refunds; sellers/admins can register shipment tracking for authorized orders.
-- Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `confirmCheckout` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
-- Checkout success redirects can arrive without a server-readable browser auth session, so `confirmCheckout` authorizes by the saved `Payment.providerOrderId` row plus Toss confirm API validation and then settles the order for `Payment.userId`.
-- Do not call `revalidateTag` from the `/checkout/success` render path; order history/detail loaders are private uncached DB reads, and Next.js rejects tag revalidation during render.
+- Checkout now uses a Toss Payments V2 payment-window flow: `prepareCheckout` stores a server-priced `Payment` session, the client opens the PG window, and `/checkout/confirm` verifies `paymentKey/orderId/amount` server-side before creating `Order`, `OrderItem`, and `Settlement` rows.
+- Checkout success redirects can arrive without a server-readable browser auth session, so `/checkout/confirm` authorizes by the saved `Payment.providerOrderId` row plus Toss confirm API validation and then settles the order for `Payment.userId`.
+- `/checkout/success` is display-only. Do not call payment confirmation or `revalidateTag` from its render path; order history/detail loaders are private uncached DB reads, and Next.js rejects tag revalidation during render.
 - Toss payment status webhooks are accepted at `/api/webhooks/toss`; configure the Toss developer-center webhook URL with `?token=$TOSS_WEBHOOK_SECRET`. The webhook reuses the same paid-payment settlement path as success redirects and can recover a `DONE` payment into an order idempotently.
 - Toss cancellation is wired for admin full-refund completion: `updateAdminRefundStatus({ status: "COMPLETED" })` calls the Toss cancel API, records the cancel response on `Payment.rawResponse`, marks the order `환불완료`, and cancels unpaid settlements. Partial refunds are intentionally blocked until the order/refund/settlement state model supports them.
 - Product detail has a buyer-facing direct order flow: `replaceCart([product])` then `/cart?checkout=1`, where cart auto-opens checkout or sends guests to `/my?auth=signin&returnTo=/cart?checkout=1`.

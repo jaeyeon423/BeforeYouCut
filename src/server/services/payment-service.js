@@ -6,6 +6,7 @@ const FAILED_PROVIDER_STATUSES = new Set(["ABORTED", "EXPIRED"]);
 const CANCELED_PROVIDER_STATUSES = new Set(["CANCELED", "PARTIAL_CANCELED"]);
 const SUPPORTED_TOSS_WEBHOOK_EVENTS = new Set(["PAYMENT_STATUS_CHANGED", "CANCEL_STATUS_CHANGED"]);
 const TOSS_CANCEL_URL_BASE = "https://api.tosspayments.com/v1/payments";
+const TOSS_CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -34,6 +35,25 @@ function getTossSecretKey() {
 
 function createTossAuthorizationHeader(secretKey) {
   return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
+}
+
+export async function confirmTossPayment({ paymentKey, orderId, amount }) {
+  const secretKey = getTossSecretKey();
+  if (!secretKey) throw new Error("TOSS_SECRET_KEY 환경변수를 설정해야 결제를 승인할 수 있습니다.");
+
+  const response = await fetch(TOSS_CONFIRM_URL, {
+    method: "POST",
+    headers: {
+      Authorization: createTossAuthorizationHeader(secretKey),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ paymentKey, orderId, amount }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.message || "토스페이먼츠 결제 승인에 실패했습니다.");
+  }
+  return payload;
 }
 
 export async function cancelTossPayment({ paymentKey, cancelReason, cancelAmount, idempotencyKey } = {}) {
@@ -168,6 +188,50 @@ export async function settlePaidPaymentWithOrder({ paymentId, activeUserId, paym
 
     return createdOrder;
   });
+}
+
+export async function confirmReadyTossPayment({ paymentKey, providerOrderId, amount, authUserId } = {}) {
+  const cleanPaymentKey = cleanText(paymentKey);
+  const cleanProviderOrderId = cleanText(providerOrderId);
+  const numericAmount = Number(amount);
+  if (!cleanPaymentKey || !cleanProviderOrderId || !Number.isFinite(numericAmount)) {
+    throw new Error("결제 승인 정보가 올바르지 않습니다.");
+  }
+
+  const payment = await prisma.payment.findUnique({
+    where: { providerOrderId: cleanProviderOrderId },
+    include: { order: true },
+  });
+  if (!payment || (authUserId && payment.userId !== authUserId)) {
+    throw new Error("결제 요청을 찾을 수 없습니다.");
+  }
+  if (payment.status === "PAID" && payment.order) {
+    return { success: true, orderId: payment.order.id, alreadyConfirmed: true };
+  }
+  if (payment.status !== "READY") throw new Error("이미 처리된 결제 요청입니다.");
+  if (payment.amount !== Math.round(numericAmount)) {
+    throw new Error("결제 금액이 서버에 저장된 금액과 일치하지 않습니다.");
+  }
+
+  const tossPayment = await confirmTossPayment({
+    paymentKey: cleanPaymentKey,
+    orderId: cleanProviderOrderId,
+    amount: payment.amount,
+  });
+  if (tossPayment.status && tossPayment.status !== PAID_PROVIDER_STATUS) {
+    throw new Error("결제가 완료 상태가 아닙니다.");
+  }
+
+  const approvedAt = tossPayment.approvedAt ? new Date(tossPayment.approvedAt) : null;
+  const order = await settlePaidPaymentWithOrder({
+    paymentId: payment.id,
+    activeUserId: payment.userId,
+    paymentKey: cleanPaymentKey,
+    rawResponse: tossPayment,
+    approvedAt: approvedAt && !Number.isNaN(approvedAt.getTime()) ? approvedAt : undefined,
+  });
+
+  return { success: true, orderId: order.id };
 }
 
 export async function handleTossPaymentWebhook(event = {}) {

@@ -219,6 +219,7 @@ describe("checkout payment flow", () => {
     expect(result.success).toBe(true);
     expect(result.clientKey).toBe("test_ck_checkout");
     expect(result.amount).toBe(30000);
+    expect(result.successUrl).toBe("http://localhost:3000/checkout/confirm");
     expect(mockPrisma.payment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         provider: "TOSS",
