@@ -662,7 +662,7 @@ function findSpecValue(rows, keys) {
   return found ? found[1] : "";
 }
 
-export function DetailScreen({ product: p, seller, related = [] }) {
+export function DetailScreen({ product: p, seller, related = [], previewMode = false }) {
   const router = useRouter();
   const { likes, toggleLike, showToast } = useApp();
   const { addCart, replaceCart } = useCart();
@@ -701,11 +701,19 @@ export function DetailScreen({ product: p, seller, related = [] }) {
   const activeImage = gallery[activeDot] || null;
 
   const handleAddCart = () => {
+    if (previewMode) {
+      showToast("검수 승인 전에는 구매할 수 없습니다.");
+      return;
+    }
     addCart(p);
     showToast("장바구니에 담았어요");
   };
 
   const handleDirectOrder = () => {
+    if (previewMode) {
+      showToast("검수 승인 전에는 주문할 수 없습니다.");
+      return;
+    }
     replaceCart([p]);
     router.push("/cart?checkout=1");
   };
@@ -750,6 +758,14 @@ export function DetailScreen({ product: p, seller, related = [] }) {
           )}
         </div>
 
+        {previewMode && (
+          <div className="pd-preview-notice">
+            <b>판매자 미리보기</b>
+            <span>이 상품은 아직 검수 전이라 구매자에게 공개되지 않습니다. 승인 전에는 구매, 장바구니, 상품 문의가 비활성화됩니다.</span>
+            <Link href={`/seller/products/${p.id}`}>상세 수정으로 돌아가기</Link>
+          </div>
+        )}
+
         <div className="pd-body">
           <div className="pd-brandline">
             <Link href={`/sellers/${s.id}`} className="pd-brand" style={{ textDecoration: "none", color: "inherit" }}>{s.name}{s.verified && <Verified />}</Link>
@@ -773,9 +789,11 @@ export function DetailScreen({ product: p, seller, related = [] }) {
             <div><Icon name="bell" size={17} /><span>문의 가능</span></div>
           </div>
           <div className="pd-action-row">
-            <button type="button" className="pd-secondary-action" onClick={() => setInquireOpen(true)}>
-              <Icon name="bell" size={17} /> 상품 문의
-            </button>
+            {!previewMode && (
+              <button type="button" className="pd-secondary-action" onClick={() => setInquireOpen(true)}>
+                <Icon name="bell" size={17} /> 상품 문의
+              </button>
+            )}
             <Link href={`/sellers/${s.id}`} className="pd-secondary-action">
               <Icon name="store" size={17} /> 브랜드 보기
             </Link>
@@ -793,7 +811,11 @@ export function DetailScreen({ product: p, seller, related = [] }) {
               <span>교환/반품</span>
               <b>수령 후 7일 이내 신청</b>
             </div>
-            <div className="pd-decision-note">결제는 PG 승인 후 주문으로 확정되며, 판매자와 상품 정보는 주문 상세에서 다시 확인할 수 있습니다.</div>
+            <div className="pd-decision-note">
+              {previewMode
+                ? "검수 승인 후 구매자에게 공개되며, 공개 전에는 결제와 문의가 차단됩니다."
+                : "결제는 PG 승인 후 주문으로 확정되며, 판매자와 상품 정보는 주문 상세에서 다시 확인할 수 있습니다."}
+            </div>
           </div>
         </div>
 
@@ -907,16 +929,23 @@ export function DetailScreen({ product: p, seller, related = [] }) {
         <Foot />
       </div>
 
-      <div className="pd-buybar">
-        <button className="like-box" onClick={() => toggleLike(p.id)}>
-          <Icon name="heart" size={22} fill={liked} stroke={1.8} />
-          <span>{((p.likes ?? 0) + (liked ? 1 : 0)).toLocaleString()}</span>
-        </button>
-        <button className="buy buy-subtle" onClick={handleAddCart}>장바구니</button>
-        <button className="buy" onClick={handleDirectOrder}>바로 주문</button>
-      </div>
+      {previewMode ? (
+        <div className="pd-buybar pd-preview-buybar">
+          <span>검수 전 미리보기</span>
+          <Link href={`/seller/products/${p.id}`} className="buy">상세 수정</Link>
+        </div>
+      ) : (
+        <div className="pd-buybar">
+          <button className="like-box" onClick={() => toggleLike(p.id)}>
+            <Icon name="heart" size={22} fill={liked} stroke={1.8} />
+            <span>{((p.likes ?? 0) + (liked ? 1 : 0)).toLocaleString()}</span>
+          </button>
+          <button className="buy buy-subtle" onClick={handleAddCart}>장바구니</button>
+          <button className="buy" onClick={handleDirectOrder}>바로 주문</button>
+        </div>
+      )}
 
-      {inquireOpen && (
+      {inquireOpen && !previewMode && (
         <ModalSheet title="상품 문의하기" onClose={() => setInquireOpen(false)}>
           <form onSubmit={handleInquireSubmit}>
             <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>셀러: {s.name}</div>

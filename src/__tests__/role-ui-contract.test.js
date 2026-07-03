@@ -85,12 +85,20 @@ describe("role-specific UI contracts", () => {
     const buyerSource = readSource("src/components/screens/other.js");
     const sellerSource = readSource("src/components/screens/seller-dashboard.js");
     const detailSource = readSource("src/utils/product-detail.js");
+    const actionsSource = readSource("src/app/actions.js");
+    const productPageSource = readSource("src/app/products/[id]/page.js");
 
     expect(buyerSource).toContain("상품 상세 내용");
     expect(buyerSource).toContain("detailNarrativeSections");
     expect(buyerSource).toContain("pd-detail-content");
+    expect(buyerSource).toContain("판매자 미리보기");
+    expect(buyerSource).toContain("previewMode");
     expect(sellerSource).toContain("상세내용 완성도");
     expect(sellerSource).toContain("PRODUCT_DETAIL_FIELDS");
+    expect(actionsSource).toContain("getProductDetailForViewer");
+    expect(actionsSource).toContain("canPreview");
+    expect(productPageSource).toContain("getProductDetailForViewer");
+    expect(productPageSource).toContain("previewMode={data.previewMode}");
     expect(detailSource).toContain("배송 안내");
     expect(detailSource).toContain("교환/반품 안내");
     expect(detailSource).toContain("구매 전 확인사항");

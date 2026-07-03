@@ -595,6 +595,54 @@ export const getProductDetail = cache((productId) => {
 });
 
 /**
+ * Product detail for public buyers, with a private preview fallback for the
+ * product-owning seller or admins. Public users still cannot see pending,
+ * inactive, or rejected products.
+ */
+export async function getProductDetailForViewer(productId) {
+  const publicData = await getProductDetail(productId);
+  if (publicData) return { ...publicData, previewMode: false };
+
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) return null;
+
+    const [user, product] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: authUser.id },
+        select: { role: true },
+      }),
+      prisma.product.findUnique({
+        where: { id: productId },
+        include: { seller: true },
+      }),
+    ]);
+
+    if (!product || product.deletedAt || !product.seller || product.seller.deletedAt) {
+      return null;
+    }
+
+    const canPreview = user?.role === "ADMIN" || product.seller.userId === authUser.id;
+    if (!canPreview) return null;
+
+    const relatedRows = await prisma.product.findMany({
+      where: { sellerId: product.sellerId, id: { not: productId }, ...PUBLIC_PRODUCT_WHERE },
+      take: 4,
+    });
+
+    return {
+      product: formatProduct(product),
+      seller: formatSeller(product.seller),
+      related: relatedRows.map(formatProduct),
+      previewMode: true,
+    };
+  } catch (error) {
+    console.error("Failed to load private product preview:", error);
+    return null;
+  }
+}
+
+/**
  * A seller profile with its full product list. Returns null when not found.
  */
 export const getSellerProfile = cache((sellerId) => {
@@ -1200,7 +1248,6 @@ export async function prepareCheckout({ name, phone, address, total, items, orig
 export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
   try {
     const authUser = await getAuthUser();
-    if (!authUser) throw new Error("로그인이 필요합니다.");
     const cleanPaymentKey = cleanText(paymentKey);
     const cleanProviderOrderId = cleanText(providerOrderId);
     const numericAmount = Number(amount);
@@ -1212,7 +1259,7 @@ export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
       where: { providerOrderId: cleanProviderOrderId },
       include: { order: true },
     });
-    if (!payment || payment.userId !== authUser.id) throw new Error("결제 요청을 찾을 수 없습니다.");
+    if (!payment || (authUser?.id && payment.userId !== authUser.id)) throw new Error("결제 요청을 찾을 수 없습니다.");
     if (payment.status === "PAID" && payment.order) {
       return { success: true, orderId: payment.order.id, alreadyConfirmed: true };
     }
@@ -1233,7 +1280,7 @@ export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
     const approvedAt = tossPayment.approvedAt ? new Date(tossPayment.approvedAt) : null;
     const order = await settlePaidPaymentWithOrder({
       paymentId: payment.id,
-      activeUserId: authUser.id,
+      activeUserId: payment.userId,
       paymentKey: cleanPaymentKey,
       rawResponse: tossPayment,
       approvedAt: approvedAt && !Number.isNaN(approvedAt.getTime()) ? approvedAt : undefined,
@@ -1958,8 +2005,15 @@ export async function getAdminDashboard() {
       }),
       prisma.refundRequest.findMany({
         include: {
-          user: { select: { email: true, name: true } },
-          order: { select: { id: true, status: true, total: true, name: true } },
+          order: {
+            select: {
+              id: true,
+              status: true,
+              total: true,
+              name: true,
+              user: { select: { email: true, name: true } },
+            },
+          },
         },
         orderBy: { requestedAt: "desc" },
         take: 30,
@@ -2017,7 +2071,7 @@ export async function getAdminDashboard() {
       refunds: refunds.map((refund) => ({
         id: refund.id,
         orderId: refund.orderId,
-        buyer: refund.user?.email || refund.userId,
+        buyer: refund.order?.user?.email || refund.userId,
         orderStatus: refund.order?.status || "",
         orderTotal: refund.order?.total || 0,
         reason: refund.reason,

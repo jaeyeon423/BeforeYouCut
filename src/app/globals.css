@@ -816,6 +816,33 @@ a, .pcard, .rankrow, .brandcell {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--ink); font-size: 12px;
 }
+.pd-preview-notice {
+  margin: 14px 18px 0;
+  border: 1px solid rgba(138, 90, 0, 0.22);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 193, 7, 0.08);
+  padding: 13px 14px;
+  display: grid;
+  gap: 5px;
+}
+.pd-preview-notice b {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: #8a5a00;
+}
+.pd-preview-notice span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.pd-preview-notice a {
+  width: fit-content;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
 .pd-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
 .pd-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(0,0,0,0.2); display: block; }
 .pd-dots i.on { background: var(--ink); width: 16px; border-radius: 3px; }
@@ -963,6 +990,24 @@ a, .pcard, .rankrow, .brandcell {
 }
 .pd-buybar .buy-subtle {
   background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong);
+}
+.pd-preview-buybar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.pd-preview-buybar span {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--muted);
+}
+.pd-preview-buybar .buy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 118px;
+  text-decoration: none;
 }
 
 .cart-summary-card {

@@ -21,17 +21,17 @@ const mockPrisma = {
     delete: vi.fn(),
   },
   product: { update: vi.fn(), create: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
-  order: { create: vi.fn(), update: vi.fn() },
+  order: { create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   payment: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-  refundRequest: { findUnique: vi.fn(), update: vi.fn() },
-  settlement: { updateMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
-  csInquiry: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  refundRequest: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  settlement: { updateMany: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+  csInquiry: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   csReply: { create: vi.fn() },
   phoneVerification: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   termsVersion: { findFirst: vi.fn() },
   consentRecord: { upsert: vi.fn() },
-  seller: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+  seller: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
 };
@@ -39,8 +39,10 @@ vi.mock("../utils/prisma", () => ({ prisma: mockPrisma, default: mockPrisma }));
 
 // ── Import after mocks ─────────────────────────────────────────────────────
 const {
+  confirmCheckout,
   createInquiry,
   createOrder,
+  getAdminDashboard,
   getMyAccountSummary,
   getMyShippingProfile,
   prepareCheckout,
@@ -284,6 +286,76 @@ describe("checkout payment flow", () => {
         sellerId: "seller-1",
         orderItemId: "item-1",
         saleAmount: 30000,
+      }),
+    }));
+  });
+
+  it("성공 리다이렉트는 현재 로그인 세션이 없어도 저장된 Payment 소유자로 결제를 확정한다", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: "DONE",
+        paymentKey: "payment-key-1",
+        approvedAt: "2026-07-03T11:50:00+09:00",
+        totalAmount: 30000,
+      }),
+    });
+    const payment = {
+      id: "payment-1",
+      providerOrderId: "ms-order-1",
+      status: "READY",
+      amount: 30000,
+      orderName: "프로 가위",
+      buyerName: "구매자",
+      buyerPhone: "01012345678",
+      shippingAddress: "서울시 강남구",
+      itemsSnapshot: [{ productId: "product-1", sellerId: "seller-1", price: 30000, quantity: 1 }],
+      userId: "user-1",
+      order: null,
+    };
+
+    vi.stubEnv("TOSS_SECRET_KEY", "test_sk_checkout");
+    vi.stubGlobal("fetch", fetchMock);
+    mockGetUser.mockResolvedValue(noUser());
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
+    mockPrisma.payment.findUnique
+      .mockResolvedValueOnce(payment)
+      .mockResolvedValueOnce(payment);
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.order.create.mockResolvedValue({
+      id: "order-1",
+      items: [{ id: "item-1", productId: "product-1", price: 30000, quantity: 1 }],
+    });
+    mockPrisma.settlement.upsert.mockResolvedValue({});
+    mockPrisma.payment.update.mockResolvedValue({});
+
+    const result = await confirmCheckout({
+      paymentKey: "payment-key-1",
+      providerOrderId: "ms-order-1",
+      amount: 30000,
+    });
+
+    expect(result).toEqual({ success: true, orderId: "order-1" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.tosspayments.com/v1/payments/confirm",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Basic /),
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          paymentKey: "payment-key-1",
+          orderId: "ms-order-1",
+          amount: 30000,
+        }),
+      })
+    );
+    expect(mockPrisma.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        userId: "user-1",
+        total: 30000,
+        status: "결제완료",
       }),
     }));
   });
@@ -857,6 +929,59 @@ describe("admin support operations", () => {
     mockGetUser.mockResolvedValue(authedUser("admin-1", "admin@example.com"));
     mockPrisma.user.findUnique.mockResolvedValue({ id: "admin-1", role: "ADMIN", email: "admin@example.com" });
     mockPrisma.auditLog.create.mockResolvedValue({});
+  });
+
+  it("관리자 대시보드는 환불 요청 구매자 정보를 주문의 구매자 관계로 불러온다", async () => {
+    mockPrisma.seller.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.order.findMany.mockResolvedValue([]);
+    mockPrisma.refundRequest.findMany.mockResolvedValue([
+      {
+        id: "refund-1",
+        orderId: "order-1",
+        userId: "buyer-1",
+        reason: "CHANGE_OF_MIND",
+        reasonDetail: "단순 변심",
+        status: "REQUESTED",
+        refundAmount: 30000,
+        requestedAt: new Date("2026-06-19T00:00:00.000Z"),
+        order: {
+          id: "order-1",
+          status: "결제완료",
+          total: 30000,
+          name: "구매자 테스트",
+          user: { email: "buyer@example.com", name: "구매자 테스트" },
+        },
+      },
+    ]);
+    mockPrisma.settlement.findMany.mockResolvedValue([]);
+    mockPrisma.csInquiry.findMany.mockResolvedValue([]);
+
+    const result = await getAdminDashboard();
+
+    expect(result.status).toBe("admin");
+    expect(result.refunds[0]).toMatchObject({
+      id: "refund-1",
+      buyer: "buyer@example.com",
+      orderStatus: "결제완료",
+      orderTotal: 30000,
+    });
+    expect(mockPrisma.refundRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.not.objectContaining({ user: expect.anything() }),
+      })
+    );
+    expect(mockPrisma.refundRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          order: expect.objectContaining({
+            select: expect.objectContaining({
+              user: { select: { email: true, name: true } },
+            }),
+          }),
+        }),
+      })
+    );
   });
 
   it("환불 완료 처리 시 주문을 환불완료로 바꾸고 미지급 정산을 제외한다", async () => {
