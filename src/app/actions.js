@@ -1286,8 +1286,8 @@ export async function confirmCheckout({ paymentKey, providerOrderId, amount }) {
       approvedAt: approvedAt && !Number.isNaN(approvedAt.getTime()) ? approvedAt : undefined,
     });
 
-    revalidateTag("orders", "max");
-    revalidateTag(`order-${order.id}`, "max");
+    // This action is invoked from the Toss success page render path. Order reads
+    // are private, uncached DB queries, so avoid revalidateTag during render.
     return { success: true, orderId: order.id };
   } catch (error) {
     console.error("Failed to confirm checkout:", error);

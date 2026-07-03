@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { revalidateTag } from "next/cache";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 const mockGetUser = vi.fn();
@@ -358,6 +359,7 @@ describe("checkout payment flow", () => {
         status: "결제완료",
       }),
     }));
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it("토스 웹훅 금액이 서버 결제 세션과 다르면 거부한다", async () => {
