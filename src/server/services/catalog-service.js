@@ -1,4 +1,5 @@
 import { prisma } from "../../utils/prisma";
+import { buildDetailValues, parseProductSpec } from "../../utils/product-detail";
 
 export const PUBLIC_SELLER_WHERE = {
   isActive: true,
@@ -94,6 +95,103 @@ export function formatProduct(p) {
   };
 }
 
+function formatMainBanner(banner) {
+  return banner ? {
+    kicker: banner.kicker,
+    title: banner.title,
+    desc: banner.desc,
+    ctaText: banner.ctaText,
+    ctaLink: banner.ctaLink,
+    icon: banner.icon,
+    tone: banner.tone,
+  } : null;
+}
+
+export function formatApiSeller(s) {
+  if (!s) return null;
+  return {
+    id: s.id,
+    name: s.name,
+    category: s.category,
+    desc: s.desc,
+    products: s.productsCount,
+    productsCount: s.productsCount,
+    followers: s.followers,
+    verified: s.verified,
+    tone: s.tone,
+    businessName: s.businessName,
+    representative: s.representative,
+  };
+}
+
+export function formatApiProduct(p) {
+  if (!p) return null;
+  const { rows, details } = parseProductSpec(p.spec);
+  const detailValues = buildDetailValues(details);
+  const seller = p.seller ? formatApiSeller(p.seller) : null;
+
+  return {
+    id: p.id,
+    sellerId: p.sellerId,
+    seller,
+    name: p.name,
+    cat: p.cat,
+    category: p.cat,
+    desc: p.desc,
+    price: p.price,
+    orig: p.orig,
+    originalPrice: p.orig,
+    disc: p.disc,
+    discount: p.disc,
+    rating: p.rating,
+    reviews: p.reviews,
+    likes: p.likesCount,
+    images: normalizeProductImages(p.images),
+    spec: p.spec,
+    specRows: rows,
+    details: {
+      intro: detailValues.intro,
+      highlights: detailValues.highlights,
+      usage: detailValues.usage,
+      shipping: detailValues.shipping,
+      returns: detailValues.returns,
+      notice: detailValues.notice,
+    },
+    badge: p.badge,
+    icon: p.icon,
+    tone: p.tone,
+  };
+}
+
+function buildProductWhere({ category = "전체", filter = null, query = "" } = {}) {
+  const cleanCategory = cleanText(category) || "전체";
+  const cleanQuery = cleanText(query);
+  const where = {
+    ...PUBLIC_PRODUCT_WHERE,
+    ...(cleanCategory !== "전체" ? { cat: cleanCategory } : {}),
+  };
+
+  if (filter === "new") {
+    where.badge = "new";
+  }
+
+  if (cleanQuery) {
+    where.OR = [
+      { name: { contains: cleanQuery, mode: "insensitive" } },
+      { desc: { contains: cleanQuery, mode: "insensitive" } },
+      { cat: { contains: cleanQuery, mode: "insensitive" } },
+    ];
+  }
+
+  return where;
+}
+
+function buildProductOrderBy(filter = null) {
+  if (filter === "best") return [{ likesCount: "desc" }, { reviews: "desc" }];
+  if (filter === "new") return [{ reviewedAt: "desc" }, { id: "desc" }];
+  return [{ id: "desc" }];
+}
+
 export async function fetchSellersMap() {
   const dbSellers = await prisma.seller.findMany({ where: PUBLIC_SELLER_WHERE });
   const map = {};
@@ -115,15 +213,33 @@ export async function fetchHomeData() {
     ranking: rankingRows.map(formatProduct),
     newItems: newRows.map(formatProduct),
     spotlightSellers: spotlightSellers.map(formatSeller),
-    mainBanner: mainBanner ? {
-      kicker: mainBanner.kicker,
-      title: mainBanner.title,
-      desc: mainBanner.desc,
-      ctaText: mainBanner.ctaText,
-      ctaLink: mainBanner.ctaLink,
-      icon: mainBanner.icon,
-      tone: mainBanner.tone,
-    } : null,
+    mainBanner: formatMainBanner(mainBanner),
+  };
+}
+
+export async function fetchApiHomeData() {
+  const [rankingRows, newRows, spotlightSellers, mainBanner] = await Promise.all([
+    prisma.product.findMany({
+      where: PUBLIC_PRODUCT_WHERE,
+      include: { seller: true },
+      orderBy: { likesCount: "desc" },
+      take: 5,
+    }),
+    prisma.product.findMany({
+      where: { ...PUBLIC_PRODUCT_WHERE, badge: { in: ["new", "best"] } },
+      include: { seller: true },
+      orderBy: buildProductOrderBy("new"),
+      take: 6,
+    }),
+    prisma.seller.findMany({ where: PUBLIC_SELLER_WHERE, take: 2, orderBy: { since: "desc" } }),
+    prisma.mainBanner.findUnique({ where: { id: "hero" } }),
+  ]);
+
+  return {
+    ranking: rankingRows.map(formatApiProduct),
+    newItems: newRows.map(formatApiProduct),
+    spotlightSellers: spotlightSellers.map(formatApiSeller),
+    mainBanner: formatMainBanner(mainBanner),
   };
 }
 
@@ -148,6 +264,27 @@ export async function fetchProductDetail(productId) {
   };
 }
 
+export async function fetchApiProductDetail(productId) {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, ...PUBLIC_PRODUCT_WHERE },
+    include: { seller: true },
+  });
+  if (!product) return null;
+
+  const relatedRows = await prisma.product.findMany({
+    where: { sellerId: product.sellerId, id: { not: productId }, ...PUBLIC_PRODUCT_WHERE },
+    include: { seller: true },
+    take: 4,
+    orderBy: buildProductOrderBy("best"),
+  });
+
+  return {
+    product: formatApiProduct(product),
+    seller: formatApiSeller(product.seller),
+    related: relatedRows.map(formatApiProduct),
+  };
+}
+
 export async function fetchSellerProfile(sellerId) {
   const seller = await prisma.seller.findFirst({ where: { id: sellerId, ...PUBLIC_SELLER_WHERE } });
   if (!seller) return null;
@@ -156,6 +293,30 @@ export async function fetchSellerProfile(sellerId) {
   return {
     seller: formatSeller(seller),
     products: products.map(formatProduct),
+  };
+}
+
+export async function fetchApiSellers() {
+  const sellers = await prisma.seller.findMany({
+    where: PUBLIC_SELLER_WHERE,
+    orderBy: [{ verified: "desc" }, { productsCount: "desc" }],
+  });
+  return { items: sellers.map(formatApiSeller) };
+}
+
+export async function fetchApiSellerProfile(sellerId) {
+  const seller = await prisma.seller.findFirst({ where: { id: sellerId, ...PUBLIC_SELLER_WHERE } });
+  if (!seller) return null;
+
+  const products = await prisma.product.findMany({
+    where: { sellerId, ...PUBLIC_PRODUCT_WHERE },
+    include: { seller: true },
+    orderBy: buildProductOrderBy("best"),
+  });
+
+  return {
+    seller: formatApiSeller(seller),
+    products: products.map(formatApiProduct),
   };
 }
 
@@ -187,5 +348,29 @@ export async function fetchCategoryProducts(cat = "전체", page = 0, limit = 20
     items: rows.map(formatProduct),
     hasMore: skip + rows.length < count,
     total: count,
+  };
+}
+
+export async function fetchApiProducts({ category = "전체", page = 0, limit = 20, filter = null, query = "" } = {}) {
+  const where = buildProductWhere({ category, filter, query });
+  const skip = page * limit;
+
+  const [rows, count] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: { seller: true },
+      skip,
+      take: limit,
+      orderBy: buildProductOrderBy(filter),
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return {
+    items: rows.map(formatApiProduct),
+    page,
+    limit,
+    total: count,
+    hasMore: skip + rows.length < count,
   };
 }

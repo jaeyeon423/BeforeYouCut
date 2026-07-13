@@ -1,6 +1,6 @@
 # 미용사 Project Context
 
-Last updated: 2026-07-01
+Last updated: 2026-07-13
 
 Purpose: give AI agents and developers the minimum project context needed to work without re-reading the whole repository. Read this first, then inspect only the task-relevant files.
 
@@ -97,6 +97,23 @@ Use `rg` first. Avoid broad scans unless the task is architectural.
 - `/seller/settings`: seller compliance, KYC documents, and settlement account settings.
 - `/admin`: admin console. Requires `User.role === "ADMIN"` or server-only `ADMIN_EMAILS` bootstrap.
 - `/terms`, `/terms/privacy`, `/terms/refund`, `/terms/seller`: legal pages.
+- `/api/v1/health`: buyer app API health check.
+- `/api/v1/home`: buyer app home catalog JSON.
+- `/api/v1/products`: buyer app public product list/search JSON.
+- `/api/v1/products/[productId]`: buyer app public product detail JSON.
+- `/api/v1/sellers`: buyer app public seller list JSON.
+- `/api/v1/sellers/[sellerId]`: buyer app public seller profile/products JSON.
+- `/api/v1/me`: authenticated buyer account and default shipping profile.
+- `/api/v1/me/shipping-profile`: authenticated buyer default shipping profile update.
+- `/api/v1/me/interactions`: authenticated buyer liked product and followed seller ids.
+- `/api/v1/me/likes/[productId]`: idempotent buyer product like add/remove.
+- `/api/v1/me/follows/[sellerId]`: idempotent buyer seller follow add/remove.
+- `/api/v1/orders`: authenticated buyer order list.
+- `/api/v1/orders/[orderId]`: buyer-owned order detail only.
+- `/api/v1/orders/[orderId]/refund-requests`: buyer-owned refund request creation.
+- `/api/v1/inquiries`: authenticated buyer product/seller/order inquiry creation.
+- `/api/v1/checkout/prepare`: server-priced app checkout creation with a signed short-lived checkout URL.
+- `/checkout/app/[token]`: signed app checkout page that opens Toss Payments and reuses the existing confirm/webhook flow.
 
 ## Data Model Snapshot
 
@@ -172,6 +189,9 @@ Environment and secrets:
 - SMS OTP uses NAVER Cloud SENS when `NAVER_SENS_*` env vars are configured; local/test environments return/log a debug code instead.
 - Future mobile expansion is planned as a Flutter buyer-only app that calls `/api/v1/*`; keep seller/admin web-only for now and move shared business logic into `src/server/services/*` before exposing API routes.
 - Public catalog read logic has started moving into `src/server/services/*`: `actions.js` keeps the Next.js cache/action boundary, while `src/server/services/catalog-service.js` owns product/seller public query rules and formatting.
+- Buyer app public catalog API phase 1 is implemented under `/api/v1/*`: health, home, product list/search, product detail, seller list, and seller profile. Route Handlers use the standard `{ ok, data/error }` envelope and call `src/server/services/catalog-service.js` instead of Server Actions.
+- Buyer app private API phase 2 is implemented for bearer-authenticated buyer profile, shipping, likes/follows, orders, refund requests, inquiries, and checkout prepare. Supabase access tokens are verified server-side, buyer ownership is derived only from the token user id, and private Route Handlers call `src/server/services/*`.
+- Flutter checkout uses `/api/v1/checkout/prepare` to receive a signed, 10-minute checkout URL. The hosted `/checkout/app/[token]` page invokes Toss Payments anonymously while the server-owned `Payment` row binds the checkout to the buyer; existing confirm/webhook settlement remains the idempotent order-creation boundary.
 - Role-specific UI composition is the product direction: buyer home/my-page surface shopping trust and account state first, seller center starts with daily operation queues, and admin console starts with risk/review queues before detailed lists.
 - Buyer purchase screens now emphasize shopping-mall decision structure: product detail has a purchase decision panel, cart has an order summary, checkout confirms line items and payment agreement text, and order detail shows fulfillment progress.
 - Buyer discovery screens now provide catalog context, filter/sort controls, search suggestions, product rails, and seller trust indicators so browsing feels like a shopping workflow rather than a static list.
@@ -207,6 +227,7 @@ Environment and secrets:
 - Sentry config files exist; production DSN/source map token values are pending and checked by `npm run verify:production-env -- --production`.
 - Production RLS and storage policies should be verified before launch.
 - Legal pages are drafts and still need legal review.
+- Buyer app API still needs the deferred signup phase: phone verification request/verify and buyer signup endpoints. Login/session persistence remains in the Flutter Supabase client.
 
 ## Detailed Docs
 

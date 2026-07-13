@@ -20,6 +20,7 @@ Vercel Project Settings > Environment Variables에서 `Production` 범위로 설
 - `TOSS_SECRET_KEY`: Production 출시 시 `live_sk_...`
 - `TOSS_WEBHOOK_SECRET`: `openssl rand -hex 32` 등으로 생성한 공유 secret
 - `PG_MERCHANT_ID`: 토스페이먼츠 상점 ID
+- `CHECKOUT_SESSION_SECRET`: 앱 결제 URL 서명용 secret, `openssl rand -hex 32` 등으로 별도 생성
 
 토스 개발자센터 웹훅 URL:
 

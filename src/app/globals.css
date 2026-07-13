@@ -1109,6 +1109,112 @@ a, .pcard, .rankrow, .brandcell {
   color: var(--muted);
 }
 
+.app-checkout-page {
+  min-height: 100dvh;
+  padding: 28px 16px;
+  background: #f5f5f3;
+}
+
+.app-checkout-panel {
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.app-checkout-heading span {
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--ink-soft);
+}
+
+.app-checkout-heading h1 {
+  margin: 8px 0 4px;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.app-checkout-heading p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.app-checkout-items {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.app-checkout-item {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-checkout-item img,
+.app-checkout-image-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #efefec;
+}
+
+.app-checkout-item div:not(.app-checkout-image-placeholder) {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.app-checkout-item strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-checkout-item span,
+.app-checkout-item b {
+  font-size: 12px;
+}
+
+.app-checkout-item span {
+  color: var(--ink-soft);
+}
+
+.app-checkout-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+}
+
+.app-checkout-total span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-checkout-total strong {
+  font-size: 20px;
+}
+
+.app-checkout-error {
+  margin: 0 0 12px;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-checkout-button {
+  width: 100%;
+  min-height: 48px;
+}
+
 /* ============================================================
    SELLER PROFILE
    ============================================================ */

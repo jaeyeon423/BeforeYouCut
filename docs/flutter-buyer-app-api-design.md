@@ -1,6 +1,34 @@
 # Flutter Buyer App API Design
 
-Last updated: 2026-06-22
+Last updated: 2026-07-13
+
+## Current Implementation Status
+
+Implemented in the Next.js web project:
+
+- `GET /api/v1/health`
+- `GET /api/v1/home`
+- `GET /api/v1/products`
+- `GET /api/v1/products/:productId`
+- `GET /api/v1/sellers`
+- `GET /api/v1/sellers/:sellerId`
+- `GET /api/v1/me`
+- `PATCH /api/v1/me/shipping-profile`
+- `GET /api/v1/me/interactions`
+- `PUT|DELETE /api/v1/me/likes/:productId`
+- `PUT|DELETE /api/v1/me/follows/:sellerId`
+- `GET /api/v1/orders`
+- `GET /api/v1/orders/:orderId`
+- `POST /api/v1/orders/:orderId/refund-requests`
+- `POST /api/v1/inquiries`
+- `POST /api/v1/checkout/prepare`
+- `GET /checkout/app/:signedToken` (hosted Toss payment page)
+
+Still pending:
+
+- `POST /api/v1/auth/phone/request`
+- `POST /api/v1/auth/phone/verify`
+- `POST /api/v1/auth/signup`
 
 ## Decision
 
@@ -427,29 +455,25 @@ Important change from current web call:
 
 Maps from current `prepareCheckout`, but the service should harden input so totals are always server-derived.
 
-Response data:
+Implemented response data:
 
 ```json
 {
-  "provider": "TOSS",
-  "clientKey": "...",
-  "customerKey": "supabase-user-id",
-  "providerOrderId": "...",
+  "checkoutId": "ms-...",
   "amount": 49000,
   "orderName": "상품명 외 1건",
-  "customerName": "홍길동",
-  "customerEmail": "buyer@example.com",
-  "customerMobilePhone": "01012345678"
+  "checkoutUrl": "https://before-you-cut.vercel.app/checkout/app/<signed-token>"
 }
 ```
 
-Flutter integration options:
+Flutter integration:
 
-- Prefer Toss mobile SDK if available for the selected app build path.
-- If using a payment WebView, define app deep links for success/fail.
-- Keep server confirmation mandatory in all cases.
+- Open `checkoutUrl` in an in-app browser, not an iframe.
+- The signed token expires after 10 minutes and does not expose the Toss secret key, DB payment id, or price inputs from the app.
+- The hosted Next.js page opens Toss Payments and redirects successful authentication to the existing `/checkout/confirm` route.
+- `/checkout/confirm` and the Toss webhook reuse the same idempotent paid-payment settlement logic, so one checkout cannot create duplicate orders.
 
-#### `POST /api/v1/checkout/confirm`
+#### `POST /api/v1/checkout/confirm` (not required by the current hosted checkout flow)
 
 Requires bearer token.
 
@@ -463,7 +487,7 @@ Body:
 }
 ```
 
-Maps from current `confirmCheckout`.
+The current phase intentionally confirms through the hosted `/checkout/confirm` redirect. A bearer-authenticated JSON confirm endpoint can be added later only if Flutter moves to a native Toss SDK/deep-link flow.
 
 The server must:
 
@@ -491,7 +515,7 @@ Returns buyer order detail only when the order belongs to the user.
 
 Maps from current `getOrderDetail`, but app API should expose only buyer role data.
 
-#### `POST /api/v1/orders/:orderId/refund`
+#### `POST /api/v1/orders/:orderId/refund-requests`
 
 Requires bearer token.
 
@@ -543,25 +567,33 @@ This lets Flutter start building home, list, search, and product detail screens 
 ### Phase 3: Buyer Auth and Profile APIs
 
 - Extract phone verification and buyer signup services.
-- Add:
+- Implemented profile endpoints:
+  - `GET /api/v1/me`
+  - `PATCH /api/v1/me/shipping-profile`
+- Deferred auth endpoints:
   - `POST /api/v1/auth/phone/request`
   - `POST /api/v1/auth/phone/verify`
   - `POST /api/v1/auth/signup`
-  - `GET /api/v1/me`
-  - `GET /api/v1/me/shipping-profile`
-  - `PATCH /api/v1/me/shipping-profile`
 
 ### Phase 4: Saved and Follow APIs
 
-- Split toggle services into explicit add/remove operations.
-- Add like/follow APIs.
+- Implemented explicit, idempotent like/follow add/remove services and APIs.
 
 ### Phase 5: Checkout and Orders
 
-- Harden checkout prepare so app sends product IDs/quantities and server computes totals.
-- Add checkout prepare/confirm APIs.
-- Add order list/detail/refund APIs.
-- Confirm Toss mobile flow and app deep link behavior.
+- Implemented server-priced checkout prepare, signed hosted payment URL, order list/detail, refund request, and inquiries.
+- Existing Toss confirm/webhook order creation remains the idempotent confirmation boundary.
+- A native SDK/deep-link JSON confirm flow is deferred until the Flutter payment UX requires it.
+
+## Deferred Auth API Design
+
+The signup endpoints remain a separate implementation phase so private buyer data APIs can ship without changing the existing web signup flow.
+
+- `POST /api/v1/auth/phone/request`: validate and normalize a Korean mobile number, apply the existing resend cooldown/rate limit, store only the hashed OTP, and never return `debugCode` in production.
+- `POST /api/v1/auth/phone/verify`: validate the six-digit OTP against the latest unexpired session, enforce the existing attempt limit, and mark the verification session as verified.
+- `POST /api/v1/auth/signup`: require an unconsumed verified phone session plus required terms consent, create the Supabase Auth user and `User` mirror as `BUYER`, record consent versions, and consume the phone verification in one service flow.
+
+These Route Handlers must call extracted auth services rather than importing `src/app/actions.js`. Flutter login and access-token refresh remain the responsibility of the Supabase Flutter SDK.
 
 ### Phase 6: Flutter Buyer MVP
 

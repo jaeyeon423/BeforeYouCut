@@ -167,6 +167,7 @@ async function main() {
   checkTossKey("TOSS_SECRET_KEY", "test_sk_", "live_sk_");
   requireEnv("TOSS_WEBHOOK_SECRET");
   requireEnv("PG_MERCHANT_ID");
+  requireEnv("CHECKOUT_SESSION_SECRET");
 
   requireEnv("ADMIN_EMAILS");
   requireEnv("ENCRYPTION_KEY", { validator: validateHexLength(64) });
