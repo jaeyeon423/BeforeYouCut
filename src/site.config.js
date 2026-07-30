@@ -10,12 +10,12 @@
 const siteConfig = {
   // ── 사업자 정보 (전자상거래법·통신판매업 공시 의무) ──────────────────
   business: {
-    name:           "미용사",                                 // TODO(운영자 입력): 사업자등록증 상호와 다르면 실제 상호로 교체
-    ceo:            "김재연",                                  // TODO(운영자 입력): 대표자명
-    address:        "수노을1로 191",                           // TODO(운영자 입력): 사업장 주소
-    phone:          "010-6375-9204",                          // TODO(운영자 입력): 고객센터 전화번호
-    email:          "jaeyeon423@gmail.com",                   // TODO(운영자 입력): 실제 수신 가능한 고객센터 이메일로 교체
-    businessRegNo:  "",                                      // TODO(운영자 입력): 사업자등록번호
+    name:           "디에이치유에이치",                        // 사업자등록증 상호
+    ceo:            "김재연",                                  // 대표자명
+    address:        "수노을1로 191",                           // 사업장 주소
+    phone:          "010-6375-9204",                          // 고객센터 전화번호
+    email:          "jaeyeon423@gmail.com",                   // 고객센터 이메일
+    businessRegNo:  "888-18-02645",                          // 사업자등록번호
     mailOrderRegNo: "",                                      // TODO(운영자 입력): 통신판매업 신고번호
     hostingLocation:"Amazon Web Services, 서울 리전 (ap-northeast-2)", // Supabase 인프라 기준 — 변경 시 업데이트
     privacyOfficer: {
