@@ -114,7 +114,6 @@ describe("role-specific UI contracts", () => {
     expect(screenSource).toContain("CATEGORY_DIRECTORY");
     expect(screenSource).toContain("category-directory");
     expect(screenSource).toContain("directory-tabs");
-    expect(screenSource).toContain("directory-filterbar");
     expect(screenSource).toContain("카테고리");
     expect(screenSource).toContain("브랜드");
     expect(screenSource).toContain("염색·펌");

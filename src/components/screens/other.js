@@ -381,12 +381,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
     }
   };
 
-  let displayTitle = cat;
-  if (filter === "new") {
-    displayTitle = `${cat} · 신상품`;
-  } else if (filter === "best") {
-    displayTitle = `${cat} · 우선 검토`;
-  }
+  const displayTitle = cat;
   const visibleItems = sortCatalogItems(items, sort);
   const currentDirectory = CATEGORY_DIRECTORY.find((category) => category.key === cat) || CATEGORY_DIRECTORY[0];
   const sellerDirectory = useMemo(() => {
@@ -408,35 +403,23 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
   const activeBrandCategory = sellerGroups.some((group) => group.key === cat) ? cat : "전체";
   const visibleSellers = activeBrandCategory === "전체" ? sellerDirectory : sellerDirectory.filter((seller) => seller.category === activeBrandCategory);
   const shouldShowProducts = visibleItems.length > 0 || filter;
-  const filterTabs = [
-    { label: "전체", value: null },
-    { label: "신상품", value: "new" },
-    { label: "우선 검토", value: "best" },
-  ];
 
   return (
     <div className="byc-scroll fadein">
       <div className="category-directory">
         <div className="directory-tabs" role="tablist" aria-label="탐색 유형">
-          <Link role="tab" aria-selected={tab === "category"} href={categoryHref(cat, filter)} className={tab === "category" ? "active" : ""}>카테고리</Link>
+          <Link role="tab" aria-selected={tab === "category"} href={categoryHref(cat, null)} className={tab === "category" ? "active" : ""}>카테고리</Link>
           <Link role="tab" aria-selected={tab === "brand"} href={categoryHref(cat, null, "brand")} className={tab === "brand" ? "active" : ""}>브랜드</Link>
         </div>
 
         {tab === "category" ? (
           <>
-            <div className="catalog-filterbar directory-filterbar">
-              {filterTabs.map((filterTab) => (
-                <Link key={filterTab.label} href={categoryHref(cat, filterTab.value)} className={"catalog-filter" + (filter === filterTab.value ? " active" : "")}>
-                  {filterTab.label}
-                </Link>
-              ))}
-            </div>
             <div className="directory-layout">
               <nav className="directory-rail" aria-label="카테고리 목록">
                 {CATEGORY_DIRECTORY.map((group) => (
                   <Link
                     key={group.key}
-                    href={categoryHref(group.key, filter)}
+                    href={categoryHref(group.key, null)}
                     className={currentDirectory.key === group.key ? "active" : ""}
                   >
                     {group.title}
@@ -451,8 +434,7 @@ export function CategoryScreen({ cat = "전체", initialItems = [], initialHasMo
                   </div>
                   <Icon name="chev-r-sm" size={16} />
                 </div>
-                <div className="directory-actions">
-                  <Link href={categoryHref(currentDirectory.key, "new")}>신상품 보기</Link>
+                <div className="directory-actions" style={{ gridTemplateColumns: "1fr" }}>
                   <Link href={categoryHref(currentDirectory.key, null)}>전체 보기</Link>
                 </div>
                 {currentDirectory.sections.map((section) => (
