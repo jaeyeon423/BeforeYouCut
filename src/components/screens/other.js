@@ -1525,7 +1525,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const openSellerCenter = () => {
     if (!user) {
       showToast("로그인이 필요한 서비스입니다.");
-      setAuthOpen("signin");
+      router.push(`/login?returnTo=${encodeURIComponent("/seller")}`);
       return;
     }
     router.push("/seller");
@@ -1533,7 +1533,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
 
   const openAdminConsole = () => {
     if (!user) {
-      setAuthOpen("signin");
+      router.push(`/login?returnTo=${encodeURIComponent("/admin")}`);
       return;
     }
     if (!isAdmin) {
@@ -1550,7 +1550,7 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
     ...(isAdmin ? [{ label: "관리자 콘솔", action: openAdminConsole }] : []),
     { label: "고객센터", action: () => {} },
     { label: "설정", action: () => {
-      if (!user) { setAuthOpen("signin"); return; }
+      if (!user) { router.push("/login"); return; }
       setSettingsOpen(true);
     } },
   ];
@@ -1564,13 +1564,13 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
         title: "로그인 후 이용 가능",
         icon: "user",
         cards: [
-          { value: "로그인", label: "내 주문/저장 확인", action: () => setAuthOpen("signin") },
-          { value: "가입", label: "구매자 계정 생성", action: () => { resetSignupForm(); setAuthOpen("signup"); } },
+          { value: "로그인", label: "내 주문/저장 확인", action: () => router.push("/login") },
+          { value: "가입", label: "구매자 계정 생성", action: () => router.push("/signup") },
         ],
         footerTitle: "계정 연결",
         footerDesc: "로그인하면 주문, 저장 상품, 기본 배송지와 역할별 화면이 계정에 맞게 표시됩니다.",
         footerAction: "로그인",
-        footerOnClick: () => setAuthOpen("signin"),
+        footerOnClick: () => router.push("/login"),
       }
     : !accountReady
       ? {
@@ -1973,7 +1973,7 @@ function LoginPrompt({ message }) {
         <div style={{ color: "var(--muted-2)", marginBottom: 14 }}><Icon name="user" size={40} stroke={1.4} /></div>
         {message}
         <div style={{ marginTop: 20 }}>
-          <Link href="/my" className="buy" style={{ display: "inline-block", padding: "10px 24px", height: "auto", textDecoration: "none" }}>로그인하러 가기</Link>
+          <Link href="/login" className="buy" style={{ display: "inline-block", padding: "10px 24px", height: "auto", textDecoration: "none" }}>로그인하러 가기</Link>
         </div>
       </div>
     </div>

@@ -15,7 +15,9 @@ function isOverlayRoute(pathname) {
     pathname.startsWith("/sellers/") ||
     pathname.startsWith("/orders/") ||
     pathname.startsWith("/checkout/") ||
-    pathname === "/cart"
+    pathname === "/cart" ||
+    pathname === "/login" ||
+    pathname === "/signup"
   );
 }
 

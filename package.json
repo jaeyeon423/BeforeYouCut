@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "verify:production-env": "node scripts/verify-production-env.js",
     "verify:storage": "node scripts/verify-storage-policies.js",
-    "bootstrap:admin": "node scripts/bootstrap-admin.js"
+    "bootstrap:admin": "node scripts/bootstrap-admin.js",
+    "clear:products": "node scripts/clear-products.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
