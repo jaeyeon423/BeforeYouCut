@@ -1351,10 +1351,14 @@ export function MyScreen({ orders = [], initialAuthMode = null, authReturnTo = n
   const [consentPrivacy, setConsentPrivacy] = useState(false);
 
   useEffect(() => {
-    if (!user && ["signin", "signup"].includes(initialAuthMode)) {
-      setAuthOpen(initialAuthMode);
+    if (!user) {
+      if (initialAuthMode === "signin") {
+        router.replace("/login");
+      } else if (initialAuthMode === "signup") {
+        router.replace("/signup");
+      }
     }
-  }, [initialAuthMode, user]);
+  }, [initialAuthMode, user, router]);
 
   useEffect(() => {
     if (!shippingProfile) return;
