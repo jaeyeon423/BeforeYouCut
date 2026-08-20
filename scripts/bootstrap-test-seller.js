@@ -118,19 +118,22 @@ async function main() {
       update: {
         name,
         verified: true,
-        desc: "미용사 테스트 판매자 계정입니다.",
-        category: "가위",
+        desc: "미용인을 위한 전문 도구 브랜드",
+        category: "도구",
         followers: "0",
         productsCount: 0,
         since: new Date().getFullYear().toString(),
         tone: "tone-a",
-        story: ["테스트와 검수를 위한 판매자 계정입니다."],
-        notice: "테스트 운영 계정",
+        story: [
+          `${name}은 미용인의 전문적인 시술 환경을 위한 고품질 도구를 제안합니다.`,
+          "현장 피드백을 바탕으로 검증된 상품과 신속한 사후관리를 약속합니다."
+        ],
+        notice: "신규 입점 안내 — 전 상품 안전 포장 및 출고",
         isActive: true,
         sellerType: "BUSINESS",
-        businessName: "테스트 셀러",
+        businessName: name,
         representative: "김재연",
-        businessRegNo: null,
+        businessRegNo: "8881802645",
         kycStatus: "APPROVED",
         kycMemo: null,
         kycSubmittedAt: new Date(),
@@ -142,17 +145,20 @@ async function main() {
         id: sellerId,
         name,
         verified: true,
-        desc: "미용사 테스트 판매자 계정입니다.",
-        category: "가위",
+        desc: "미용인을 위한 전문 도구 브랜드",
+        category: "도구",
         followers: "0",
         productsCount: 0,
         since: new Date().getFullYear().toString(),
         tone: "tone-a",
-        story: ["테스트와 검수를 위한 판매자 계정입니다."],
-        notice: "테스트 운영 계정",
+        story: [
+          `${name}은 미용인의 전문적인 시술 환경을 위한 고품질 도구를 제안합니다.`,
+          "현장 피드백을 바탕으로 검증된 상품과 신속한 사후관리를 약속합니다."
+        ],
+        notice: "신규 입점 안내 — 전 상품 안전 포장 및 출고",
         isActive: true,
         sellerType: "BUSINESS",
-        businessName: "테스트 셀러",
+        businessName: name,
         representative: "김재연",
         kycStatus: "APPROVED",
         kycSubmittedAt: new Date(),
@@ -162,7 +168,7 @@ async function main() {
       },
     });
 
-    console.log(`PASS ${email} - SELLER test account is ready (${sellerId})`);
+    console.log(`PASS ${email} - SELLER account is ready (${sellerId})`);
   } finally {
     await prisma.$disconnect();
   }
