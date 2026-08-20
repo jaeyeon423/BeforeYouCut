@@ -14,8 +14,6 @@ export default function PrivacyPolicyPage() {
     <>
       <TabHeader title="개인정보처리방침" bordered />
       <TermsLayout title="개인정보처리방침" version={version} effectiveAt={effectiveAt}>
-        {/* TODO(법무 검토): 아래는 서비스 구현 기준 초안입니다. 시행 전 법무 검토가 필요합니다. */}
-
         <P>
           {business.name}(이하 &quot;회사&quot;)은 {service.name} 이용자의 개인정보를 보호하고 관련 고충을 신속히 처리하기 위해
           다음과 같이 개인정보처리방침을 수립·공개합니다.

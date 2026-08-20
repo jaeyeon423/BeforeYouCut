@@ -22,8 +22,6 @@ export default function SellerTermsPage() {
     <>
       <TabHeader title="판매자 약관" bordered />
       <TermsLayout title="판매자(입점) 약관" version={version} effectiveAt={effectiveAt}>
-        {/* TODO(법무 검토): 아래는 구현 정책 기준 초안입니다. 시행 전 법률 검토가 필요합니다. */}
-
         <Section title="제1조 (목적)">
           이 약관은 {business.name}(이하 &quot;회사&quot;)과 {service.name} 서비스에 입점하는 판매자 사이의
           상품 등록, 판매, 배송, CS, 환불, 정산에 관한 권리·의무를 정합니다.

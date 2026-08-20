@@ -14,8 +14,6 @@ export default function UserTermsPage() {
     <>
       <TabHeader title="이용약관" bordered />
       <TermsLayout title="이용약관" version={version} effectiveAt={effectiveAt}>
-        {/* TODO(법무 검토): 아래 약관 초안은 구현 정책 기준 초안입니다. 시행 전 법률 검토가 필요합니다. */}
-
         <Section title="제1조 (목적)">
           이 약관은 {business.name}(이하 &quot;회사&quot;)이 운영하는 {service.name} 서비스(이하 &quot;서비스&quot;)의
           이용과 관련하여 회사와 이용자 사이의 권리·의무 및 책임 사항을 정합니다.
